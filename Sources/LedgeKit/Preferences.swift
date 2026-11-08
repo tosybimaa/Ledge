@@ -18,7 +18,7 @@ enum K: String, CaseIterable {
     // Weather
     case weather, weatherDetailed, preciseLocation
     // Lock Screen
-    case lockGlass, lockFullArt, lockLyrics, lyricsSync, lockGlassArt, lockGlassCard, keepAwake
+    case lockScreenPlayer, lockGlass, lockFullArt, lockLyrics, lyricsSync, lockGlassArt, lockGlassCard, keepAwake
     // Accessories
     case accessoryConnect, outputChange, listeningMode, accessoryStyle, glyph3D, accessoryDuration
     // Appearance
@@ -45,7 +45,7 @@ enum Preferences {
         .chargerConnect: true, .batteryStyle: BatteryStyle.classic.rawValue, .batteryDuration: 5.0,
         .focusOverlay: true, .focusShowBattery: true, .focusShowAirPods: true, .focusShowSensory: true, .focusWidget: true,
         .weather: true, .weatherDetailed: false, .preciseLocation: true,
-        .lockGlass: GlassStyle.frosted.rawValue, .lockFullArt: true, .lockLyrics: true, .lyricsSync: 0.0,
+        .lockScreenPlayer: true, .lockGlass: GlassStyle.frosted.rawValue, .lockFullArt: true, .lockLyrics: true, .lyricsSync: 0.0,
         .lockGlassArt: false, .lockGlassCard: true, .keepAwake: false,
         .accessoryConnect: true, .outputChange: true, .listeningMode: true, .accessoryStyle: AccessoryStyle.single.rawValue,
         .glyph3D: true, .accessoryDuration: 4.0,

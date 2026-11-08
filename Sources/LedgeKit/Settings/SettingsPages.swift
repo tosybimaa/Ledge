@@ -333,6 +333,7 @@ struct WeatherPage: View {
 }
 
 struct LockScreenPage: View {
+    @AppStorage(K.lockScreenPlayer.rawValue) private var onLockScreen = true
     @AppStorage(K.lockGlass.rawValue) private var glass = GlassStyle.frosted
     @AppStorage(K.lockFullArt.rawValue) private var fullArt = true
     @AppStorage(K.lockLyrics.rawValue) private var lyrics = true
@@ -344,6 +345,9 @@ struct LockScreenPage: View {
     var body: some View {
         SettingsScroll {
             LockPreview()
+            SettingsCard(footer: "Experimental: uses a private part of macOS, so a macOS update can stop it from showing. Nothing else breaks if it does.") {
+                ToggleRow("Show Player on Lock Screen", isOn: $onLockScreen)
+            }
             SettingsCard { ChoiceButtons(title: "Glass Style", selection: $glass) }
             SettingsCard(title: "Behavior") {
                 ToggleRow("Full Art", isOn: $fullArt)

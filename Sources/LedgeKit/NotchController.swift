@@ -18,6 +18,7 @@ final class NotchController: ObservableObject {
     private var edgePanel: NotchPanel?
     private var hudTask: Task<Void, Never>?
     private var lockPreview: NSWindow?
+    private lazy var lockScreen = LockScreenWindow(player: player)
     private var observers: [NSObjectProtocol] = []
     private var pauseWatch: AnyCancellable?
     private var shownDisplay = ""
@@ -58,6 +59,11 @@ final class NotchController: ObservableObject {
             guard let self, !playing, self.expanded, Self.isOn(.collapseOnPause) else { return }
             self.expanded = false
         }
+    }
+
+    /// Called by SystemMonitor when the screen locks and unlocks.
+    func setLocked(_ locked: Bool) {
+        if locked { lockScreen.show() } else { lockScreen.hide() }
     }
 
     func toggleHidden() {

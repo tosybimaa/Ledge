@@ -100,11 +100,14 @@ enum MusicApp: String {
         + "var label=function(id){var e=document.querySelector('[data-testid='+id+']');if(!e)return 0;"
         + "return e.textContent.split(':').map(Number).reduce(function(a,b){return a*60+b;},0)||0;};"
         + "var a=md&&md.artwork&&md.artwork.length?md.artwork[md.artwork.length-1].src:'';"
-        + "var pos=m?Math.floor(m.currentTime):label('playback-position');"
+        // Spotify web also runs a short looping helper <audio>; its own time labels are the real song, so they win.
+        + "var own=!!md&&!!document.querySelector('[data-testid=playback-duration]');"
+        + "var el=own?null:m;"
+        + "var pos=el?Math.floor(el.currentTime):label('playback-position');"
         // Spotify often leaves playbackState at 'none'; then "playing" means the time label moved in the last 2.5 s.
         + "if(pos!==window.__ledgePos){window.__ledgePos=pos;window.__ledgeMoved=Date.now();}"
-        + "var playing=m?!m.paused:(st==='playing'||(st==='none'&&Date.now()-(window.__ledgeMoved||0)<2500));"
-        + "var dur=m?(isFinite(m.duration)?Math.floor(m.duration):0):label('playback-duration');"
+        + "var playing=el?!el.paused:(st==='playing'||(st!=='paused'&&Date.now()-(window.__ledgeMoved||0)<2500));"
+        + "var dur=el?(isFinite(el.duration)?Math.floor(el.duration):0):label('playback-duration');"
         + "return [playing?'playing':'paused',(md&&md.title)||document.title,(md&&md.artist)||'',pos,dur,'false',a]"
         + ".join(String.fromCharCode(31));")
 }
@@ -165,7 +168,7 @@ final class PlayerModel: ObservableObject {
 
     func togglePlay() {
         if app?.isBrowser == true {
-            pageCommand("if(m){m.paused?m.play():m.pause();}else{var b=document.querySelector('[data-testid=control-button-playpause]');if(b)b.click();}return '';")
+            pageCommand("var b=document.querySelector('[data-testid=control-button-playpause]');if(b){b.click();}else if(m){m.paused?m.play():m.pause();}return '';")
         } else {
             command("playpause")
         }
@@ -189,7 +192,7 @@ final class PlayerModel: ObservableObject {
     }
 
     func seek(to seconds: TimeInterval) {
-        if app?.isBrowser == true { pageCommand("if(m)m.currentTime=\(Int(seconds));return '';") } else { command("set player position to \(Int(seconds))") }
+        if app?.isBrowser == true { pageCommand("if(m&&!document.querySelector('[data-testid=playback-duration]'))m.currentTime=\(Int(seconds));return '';") } else { command("set player position to \(Int(seconds))") }
     }
 
     func seekToLyric(_ index: Int) {

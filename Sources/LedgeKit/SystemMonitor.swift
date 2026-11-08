@@ -83,6 +83,7 @@ final class SystemMonitor: NSObject {
             sound.volume = Float(UserDefaults.standard.double(forKey: K.soundVolume.rawValue))
             sound.play()
         }
+        notch.setLocked(isLocked)
         if !isLocked { notch.flash(.lock(false), seconds: 1.5) }
     }
 
