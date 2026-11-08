@@ -9,10 +9,8 @@ final class Updater: ObservableObject {
     static let shared = Updater()
 
     /// GitHub "owner/repo" that holds the releases. The repo (or at least its releases) must be public.
-    static let repository = "YOUR-GITHUB-NAME/ledge"
-    /// Base64 public key printed by `swift scripts/update-key.swift generate`.
-    /// While empty, downloads are refused, so nobody else can push code into the app.
-    static let publicKey = ""
+    static let repository = "tosybimaa/Ledge"
+    static let publicKey = "2zE3rtkqPx/bDbTtbugothb4TO7hMsft8LrIuUFg+f8="
 
     enum Status: Equatable {
         case idle, checking, upToDate, notInstalled
