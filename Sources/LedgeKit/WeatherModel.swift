@@ -37,8 +37,8 @@ final class WeatherModel: NSObject, ObservableObject, CLLocationManagerDelegate 
     }
 
     func refresh() {
-        guard UserDefaults.standard.object(forKey: K.weather.rawValue) as? Bool ?? true else { return }
-        if UserDefaults.standard.object(forKey: K.preciseLocation.rawValue) as? Bool ?? true {
+        guard UserDefaults.standard.bool(forKey: K.weather.rawValue) else { return }
+        if UserDefaults.standard.bool(forKey: K.preciseLocation.rawValue) {
             location.requestWhenInUseAuthorization()
             location.requestLocation()
         } else {

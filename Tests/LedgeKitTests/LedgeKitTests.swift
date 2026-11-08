@@ -70,4 +70,14 @@ final class LedgeKitTests: XCTestCase {
         XCTAssertEqual(WeatherModel.symbol(code: 63, day: true), "cloud.rain.fill")
         XCTAssertEqual(WeatherModel.condition(code: 95), "Thunderstorm")
     }
+
+    func testEverySettingHasOneRegisteredDefault() throws {
+        let missing = K.allCases.filter { $0 != .lastUpdateCheck && Preferences.defaults[$0] == nil }
+        XCTAssertEqual(missing, [], "Add these to Preferences.defaults")
+        let store = try XCTUnwrap(UserDefaults(suiteName: "LedgeKitTests.defaults"))
+        Preferences.registerDefaults(store)
+        XCTAssertEqual(store.double(forKey: K.sensoryDuration.rawValue), 3)
+        XCTAssertFalse(store.bool(forKey: K.hideFromCapture.rawValue))
+        XCTAssertTrue(store.bool(forKey: K.expandOnHover.rawValue))
+    }
 }

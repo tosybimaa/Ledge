@@ -5,7 +5,9 @@ public struct LedgeApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var app
     @AppStorage(K.menuBarIcon.rawValue) private var menuBarIcon = true
 
-    public init() {}
+    public init() {
+        Preferences.registerDefaults()
+    }
 
     public var body: some Scene {
         MenuBarExtra("Ledge", systemImage: "capsule.fill", isInserted: $menuBarIcon) {

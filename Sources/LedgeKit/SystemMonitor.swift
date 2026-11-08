@@ -35,8 +35,8 @@ final class SystemMonitor: NSObject {
         super.init()
     }
 
-    private func isOn(_ key: K, default value: Bool = true) -> Bool {
-        UserDefaults.standard.object(forKey: key.rawValue) as? Bool ?? value
+    private func isOn(_ key: K) -> Bool {
+        UserDefaults.standard.bool(forKey: key.rawValue)
     }
 
     func start() {
@@ -80,7 +80,7 @@ final class SystemMonitor: NSObject {
     private func locked(_ isLocked: Bool) {
         let soundOn = isOn(isLocked ? .lockSound : .unlockSound)
         if soundOn, let sound = NSSound(named: isLocked ? "Pop" : "Tink") {
-            sound.volume = Float(UserDefaults.standard.object(forKey: K.soundVolume.rawValue) as? Double ?? 1)
+            sound.volume = Float(UserDefaults.standard.double(forKey: K.soundVolume.rawValue))
             sound.play()
         }
         if !isLocked { notch.flash(.lock(false), seconds: 1.5) }

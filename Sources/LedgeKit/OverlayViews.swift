@@ -28,18 +28,12 @@ enum NotchHUD: Hashable {
 
     /// How long it stays, from the Overlay Duration sliders.
     var duration: Double {
-        let key: K? = switch self {
-        case .volume, .brightness: .sensoryDuration
-        case .charging: .batteryDuration
-        case .accessory, .output: .accessoryDuration
-        default: nil
-        }
-        let fallback: Double = switch self {
-        case .charging: 5
-        case .accessory, .output: 4
+        switch self {
+        case .volume, .brightness: UserDefaults.standard.double(forKey: K.sensoryDuration.rawValue)
+        case .charging: UserDefaults.standard.double(forKey: K.batteryDuration.rawValue)
+        case .accessory, .output: UserDefaults.standard.double(forKey: K.accessoryDuration.rawValue)
         default: 3
         }
-        return key.flatMap { UserDefaults.standard.object(forKey: $0.rawValue) as? Double } ?? fallback
     }
 }
 

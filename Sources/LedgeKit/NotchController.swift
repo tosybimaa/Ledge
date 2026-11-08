@@ -28,8 +28,8 @@ final class NotchController: ObservableObject {
 
     init(player: PlayerModel) { self.player = player }
 
-    private static func isOn(_ key: K, default value: Bool = true) -> Bool {
-        UserDefaults.standard.object(forKey: key.rawValue) as? Bool ?? value
+    private static func isOn(_ key: K) -> Bool {
+        UserDefaults.standard.bool(forKey: key.rawValue)
     }
 
     func show() {
@@ -45,6 +45,12 @@ final class NotchController: ObservableObject {
         for name in [NSWorkspace.activeSpaceDidChangeNotification, NSWorkspace.didActivateApplicationNotification] {
             observers.append(workspace.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
                 Task { @MainActor in self?.updateFullscreen() }
+            })
+        }
+        // After sleep the window server can drop or move the pill windows; rebuild them on wake.
+        for name in [NSWorkspace.didWakeNotification, NSWorkspace.screensDidWakeNotification, NSWorkspace.sessionDidBecomeActiveNotification] {
+            observers.append(workspace.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
+                Task { @MainActor in self?.rebuildPanels() }
             })
         }
         // Settings › Media › Collapse on Pause.
@@ -104,7 +110,7 @@ final class NotchController: ObservableObject {
 
     /// Settings › Hide from Screen Capture.
     private func applyCapture() {
-        let hidden = Self.isOn(.hideFromCapture, default: false)
+        let hidden = Self.isOn(.hideFromCapture)
         (panels + [edgePanel].compactMap { $0 }).forEach { $0.sharingType = hidden ? .none : .readOnly }
     }
 
@@ -135,7 +141,7 @@ final class NotchController: ObservableObject {
         guard let screen = NSScreen.main else { return }
         let size = CGSize(width: 64, height: 160)
         let right = UserDefaults.standard.string(forKey: K.edgeSide.rawValue) == ScreenEdge.right.rawValue
-        let height = UserDefaults.standard.object(forKey: K.edgeHeight.rawValue) as? Double ?? 0.5
+        let height = UserDefaults.standard.double(forKey: K.edgeHeight.rawValue)
         let area = screen.visibleFrame
         let frame = NSRect(x: right ? area.maxX - size.width - 8 : area.minX + 8,
                            y: area.maxY - size.height - (area.height - size.height) * height,

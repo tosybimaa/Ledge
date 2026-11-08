@@ -28,6 +28,36 @@ enum K: String, CaseIterable {
 }
 
 enum Preferences {
+    /// The one place default values live. Registered at launch, so every reader (Settings, pill, monitors)
+    /// gets the same value; the literals next to each @AppStorage are only a compile-time fallback.
+    static let defaults: [K: Any] = [
+        .display: DisplayChoice.all.rawValue, .hideInFullscreen: true, .hideFromCapture: false, .menuBarIcon: true,
+        .liquidGlass: true, .glassTint: 0.1, .hapticTouch: true, .expandOnHover: true, .hoverDelay: 0.0,
+        .backgroundBlur: true, .liveWaveform: false, .lockSound: true, .unlockSound: true, .soundVolume: 1.0,
+        .notchWidth: 0.0, .notchHeight: 0.0,
+        .mediaPlayer: true, .source: MediaSource.auto.rawValue, .eq: false,
+        .eqSub: 0.0, .eqLow: 0.0, .eqMid: 0.0, .eqPres: 0.0, .eqAir: 0.0, .leftButton: LeftButton.like.rawValue,
+        .explicitTag: true, .explicitColor: true, .animatedArtwork: true, .heartMatchColor: false,
+        .collapseOnPause: true, .hideAfter: 0.0,
+        .sensoryStyle: SensoryStyle.notch.rawValue, .edgeSide: ScreenEdge.left.rawValue, .edgeHeight: 0.5,
+        .brightnessOverlay: true, .volumeOverlay: true, .sensoryMatchColor: false, .overlayLabel: OverlayLabel.icon.rawValue,
+        .sensoryDuration: 3.0,
+        .chargerConnect: true, .batteryStyle: BatteryStyle.classic.rawValue, .batteryDuration: 5.0,
+        .focusOverlay: true, .focusShowBattery: true, .focusShowAirPods: true, .focusShowSensory: true, .focusWidget: true,
+        .weather: true, .weatherDetailed: false, .preciseLocation: true,
+        .lockGlass: GlassStyle.frosted.rawValue, .lockFullArt: true, .lockLyrics: true, .lyricsSync: 0.0,
+        .lockGlassArt: false, .lockGlassCard: true, .keepAwake: false,
+        .accessoryConnect: true, .outputChange: true, .listeningMode: true, .accessoryStyle: AccessoryStyle.single.rawValue,
+        .glyph3D: true, .accessoryDuration: 4.0,
+        .uiScale: 1.0, .pillScale: 1.0, .textScale: 1.0, .fontDesign: FontChoice.system.rawValue, .borderWidth: 1.0,
+        .cornerRadius: 1.0, .accentColor: AccentChoice.system.rawValue,
+        .autoUpdate: true, .crashReports: true,
+    ]
+
+    static func registerDefaults(_ store: UserDefaults = .standard) {
+        store.register(defaults: Dictionary(uniqueKeysWithValues: defaults.map { ($0.key.rawValue, $0.value) }))
+    }
+
     static let appearance: [K] = [.uiScale, .pillScale, .textScale, .fontDesign, .borderWidth, .cornerRadius, .glassTint, .accentColor]
 
     /// Launch at Login lives in SMAppService, not here, so it survives a reset.
