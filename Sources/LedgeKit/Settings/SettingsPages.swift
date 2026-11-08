@@ -83,6 +83,7 @@ struct GeneralPage: View {
 
 struct AppearancePage: View {
     @AppStorage(K.uiScale.rawValue) private var uiScale = Look().uiScale
+    @AppStorage(K.pillScale.rawValue) private var pillScale = Look().pillScale
     @AppStorage(K.textScale.rawValue) private var textScale = Look().textScale
     @AppStorage(K.fontDesign.rawValue) private var font = FontChoice.system
     @AppStorage(K.borderWidth.rawValue) private var border = Look().border
@@ -96,7 +97,8 @@ struct AppearancePage: View {
     var body: some View {
         SettingsScroll {
             AppearancePreview(player: sample)
-            SettingsCard(title: "Size", footer: "Interface Size scales the pill, overlays and lock screen player. Text Size changes every label, here too.") {
+            SettingsCard(title: "Size", footer: "Closed Pill Size is the pill before you hover, and the overlays in it. Interface Size is the open player and the lock screen player. Text Size changes every label, here too.") {
+                SettingSlider(title: "Closed Pill Size", value: $pillScale, range: 0.8...1.6, step: 0.05, display: percent(pillScale), low: "Smaller", high: "Larger")
                 SettingSlider(title: "Interface Size", value: $uiScale, range: 0.8...1.4, step: 0.05, display: percent(uiScale), low: "Smaller", high: "Larger")
                 SettingSlider(title: "Text Size", value: $textScale, range: 0.85...1.5, step: 0.05, display: percent(textScale), low: "Smaller", high: "Larger")
             }
