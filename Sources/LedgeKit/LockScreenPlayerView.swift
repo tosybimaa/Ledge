@@ -5,7 +5,11 @@ import SwiftUI
 /// Positions are fractions of the reference 1440 × 900 pt screen so the preview window can be any size.
 struct LockScreenPlayerView: View {
     @ObservedObject var player: PlayerModel
+    /// On the real lock screen macOS draws the clock, wallpaper and login itself, so those stay out.
+    var onLockScreen = false
     @ObservedObject private var weather = WeatherModel.shared
+    @AppStorage(K.lockFullArt.rawValue) private var fullArt = true
+    @AppStorage(K.lockLyrics.rawValue) private var lyricsAllowed = true
     @Environment(\.look) private var look
     @State private var mode = Mode.mini
     @State private var lyricsOn = false
@@ -13,26 +17,38 @@ struct LockScreenPlayerView: View {
     enum Mode { case mini, artwork, hidden }
 
     private var artwork: Bool { mode == .artwork }
+    private var showsPlayer: Bool { !onLockScreen || player.hasTrack }
     private var motion: Animation { .spring(response: 0.6, dampingFraction: 0.86) }
 
     var body: some View {
         GeometryReader { geo in
             let h = geo.size.height
             ZStack(alignment: .top) {
-                LinearGradient(colors: [Color(white: 0.26), Color(white: 0.06)], startPoint: .top, endPoint: .bottom)
+                if onLockScreen {
+                    // Your own wallpaper shows through; the artwork view darkens it like the reference.
+                    Color.black.opacity(artwork ? 0.82 : 0)
+                } else {
+                    LinearGradient(colors: [Color(white: 0.26), Color(white: 0.06)], startPoint: .top, endPoint: .bottom)
+                }
                 RadialGradient(colors: [.orange.opacity(0.4), .clear], center: UnitPoint(x: 0.25, y: 0.55), startRadius: 0, endRadius: 700)
                     .opacity(artwork ? 1 : 0)
 
                 header.padding(.top, h * 0.085)
-                stage(height: h)
-                    .scaleEffect(look.uiScale, anchor: .top)  // Appearance › Interface Size
-                login
-                    .frame(maxHeight: .infinity, alignment: .bottom)
-                    .padding(.bottom, h * 0.05)
-                    .opacity(artwork ? 0 : 1)
-                    .offset(y: artwork ? 16 : 0)
+                if showsPlayer {
+                    stage(height: h)
+                        .scaleEffect(look.uiScale, anchor: .top)  // Appearance › Interface Size
+                }
+                if !onLockScreen {
+                    login
+                        .frame(maxHeight: .infinity, alignment: .bottom)
+                        .padding(.bottom, h * 0.05)
+                        .opacity(artwork ? 0 : 1)
+                        .offset(y: artwork ? 16 : 0)
+                }
             }
-            .overlay(alignment: .topLeading) { sideButtons.padding(29) }
+            .overlay(alignment: .topLeading) {
+                if showsPlayer { sideButtons.padding(29) }
+            }
         }
         .foregroundStyle(.white)
         .environment(\.colorScheme, .dark)
@@ -52,6 +68,8 @@ struct LockScreenPlayerView: View {
                 }
             }
             .foregroundStyle(.white.opacity(0.8))
+            // On the lock screen the system clock is already there; keep the space so the weather row lines up under it.
+            .opacity(onLockScreen && !artwork ? 0 : 1)
             HStack(spacing: 24) {
                 if let temperature = weather.temperature {
                     Label("\(temperature)°", systemImage: weather.symbol)
@@ -68,7 +86,7 @@ struct LockScreenPlayerView: View {
     @ViewBuilder private func stage(height h: CGFloat) -> some View {
         switch mode {
         case .mini:
-            MiniPlayerCard(player: player) { mode = .artwork }
+            MiniPlayerCard(player: player) { if fullArt { mode = .artwork } }
                 .padding(.top, h * 0.575)
                 .transition(.opacity.combined(with: .scale(scale: 0.94)))
         case .artwork:
@@ -78,7 +96,9 @@ struct LockScreenPlayerView: View {
                         lyricsOn = false
                         mode = .mini
                     } label: {
-                        Artwork(size: 386, corner: 16, image: player.artwork).shadow(color: .black.opacity(0.4), radius: 30, y: 20)
+                        Artwork(size: 386, corner: 16, image: player.artwork)
+                            .overlay { GlassArtSheen(corner: 16) }
+                            .shadow(color: .black.opacity(0.4), radius: 30, y: 20)
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel("Back to mini player")
@@ -108,12 +128,14 @@ struct LockScreenPlayerView: View {
     /// Two 36 pt circles, 29 pt from the corner, 6 pt apart.
     private var sideButtons: some View {
         VStack(spacing: 6) {
-            RoundButton(symbol: "quote.bubble", label: "Show lyrics", isOn: artwork && lyricsOn) {
-                if artwork && lyricsOn {
-                    lyricsOn = false
-                } else {
-                    mode = .artwork
-                    lyricsOn = true
+            if lyricsAllowed {
+                RoundButton(symbol: "quote.bubble", label: "Show lyrics", isOn: artwork && lyricsOn) {
+                    if artwork && lyricsOn {
+                        lyricsOn = false
+                    } else {
+                        mode = .artwork
+                        lyricsOn = true
+                    }
                 }
             }
             RoundButton(symbol: "eye.slash", label: "Hide player", isOn: mode == .hidden) {
@@ -133,8 +155,50 @@ struct MiniPlayerCard: View {
     var body: some View {
         PlayerCardContent(player: player, art: 60, artGap: 21, timeInset: 10, onArtwork: openArtwork)
             .frame(width: 330)
-            .glass(in: RoundedRectangle(cornerRadius: look.r(28), style: .continuous), tint: .black.opacity(look.glassDarkness))
-            .overlay(RoundedRectangle(cornerRadius: look.r(28), style: .continuous).strokeBorder(.white.opacity(0.14), lineWidth: look.border))
+            .lockCardBackground(cornerRadius: look.r(28), border: look.border, glassDarkness: look.glassDarkness)
+    }
+}
+
+extension View {
+    /// Settings › Lock Screen: Glass Card off = solid dark card; Glass Style Clear = see-through, Frosted = darker glass.
+    func lockCardBackground(cornerRadius: CGFloat, border: CGFloat, glassDarkness: Double) -> some View {
+        modifier(LockCardBackground(cornerRadius: cornerRadius, border: border, glassDarkness: glassDarkness))
+    }
+}
+
+private struct LockCardBackground: ViewModifier {
+    var cornerRadius: CGFloat
+    var border: CGFloat
+    var glassDarkness: Double
+    @AppStorage(K.lockGlassCard.rawValue) private var glassCard = true
+    @AppStorage(K.lockGlass.rawValue) private var style = GlassStyle.frosted
+
+    func body(content: Content) -> some View {
+        let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+        Group {
+            if glassCard {
+                content.glass(in: shape, tint: .black.opacity(style == .clear ? 0.15 : glassDarkness))
+            } else {
+                content.background(Color(white: 0.09), in: shape)
+            }
+        }
+        .overlay(shape.strokeBorder(.white.opacity(0.14), lineWidth: border))
+    }
+}
+
+/// Settings › Lock Screen › Glass Art: a light glass reflection over the big artwork.
+private struct GlassArtSheen: View {
+    var corner: CGFloat
+    @AppStorage(K.lockGlassArt.rawValue) private var on = false
+    @Environment(\.look) private var look
+
+    var body: some View {
+        let shape = RoundedRectangle(cornerRadius: look.r(corner), style: .continuous)
+        shape
+            .fill(LinearGradient(colors: [.white.opacity(0.28), .clear, .white.opacity(0.08)], startPoint: .topLeading, endPoint: .bottomTrailing))
+            .overlay(shape.strokeBorder(.white.opacity(0.3), lineWidth: 1))
+            .opacity(on ? 1 : 0)
+            .allowsHitTesting(false)
     }
 }
 
@@ -162,8 +226,7 @@ struct GlassPlayerCard: View {
         }
         .padding(EdgeInsets(top: 16, leading: 20, bottom: 13, trailing: 20))
         .frame(width: 330)
-        .glass(in: RoundedRectangle(cornerRadius: look.r(26), style: .continuous), tint: .white.opacity(0.06))
-        .overlay(RoundedRectangle(cornerRadius: look.r(26), style: .continuous).strokeBorder(.white.opacity(0.18), lineWidth: look.border))
+        .lockCardBackground(cornerRadius: look.r(26), border: look.border, glassDarkness: look.glassDarkness * 0.5)
     }
 }
 

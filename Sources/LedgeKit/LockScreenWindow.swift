@@ -1,7 +1,9 @@
 import AppKit
+import IOKit.pwr_mgt
 import SwiftUI
 
-/// Puts the mini player on the macOS lock screen while the Mac is locked (Settings › Lock Screen).
+/// Puts the planned lock-screen layout (weather row, mini player, artwork and lyrics views, side buttons)
+/// over the macOS lock screen while the Mac is locked (Settings › Lock Screen).
 /// Normal windows sit under the lock screen; this one is moved into a SkyLight window space that
 /// macOS draws above it, the same way Canopy does.
 /// shortcut: SkyLight is private to Apple. If a macOS update renames these calls, the player just doesn't
@@ -14,10 +16,10 @@ final class LockScreenWindow {
     private typealias ShowSpaces = @convention(c) (Int32, CFArray) -> Int32
     private typealias AddWindows = @convention(c) (Int32, Int32, CFArray, Int32) -> Int32
 
-    private static let size = CGSize(width: 360, height: 210)
     private let player: PlayerModel
     private var window: NSPanel?
     private var unavailable = false
+    private var awake: IOPMAssertionID = 0
 
     init(player: PlayerModel) { self.player = player }
 
@@ -29,14 +31,22 @@ final class LockScreenWindow {
             unavailable = true
             return
         }
-        // Card top at 57.5 % of the screen height, like the reference lock screen.
-        let frame = screen.frame
-        window.setFrameOrigin(NSPoint(x: frame.midX - Self.size.width / 2,
-                                      y: frame.maxY - frame.height * 0.575 - Self.size.height))
+        window.setFrame(screen.frame, display: true)
         window.orderFrontRegardless()
+        // Settings › Lock Screen › Keep Display Awake, while music plays.
+        if UserDefaults.standard.bool(forKey: K.keepAwake.rawValue), player.isPlaying, awake == 0 {
+            IOPMAssertionCreateWithName(kIOPMAssertionTypeNoDisplaySleep as CFString, IOPMAssertionLevel(kIOPMAssertionLevelOn),
+                                        "Ledge lock screen player" as CFString, &awake)
+        }
     }
 
-    func hide() { window?.orderOut(nil) }
+    func hide() {
+        window?.orderOut(nil)
+        if awake != 0 {
+            IOPMAssertionRelease(awake)
+            awake = 0
+        }
+    }
 
     private func makeWindow() -> NSPanel? {
         guard let sky = dlopen("/System/Library/PrivateFrameworks/SkyLight.framework/Versions/A/SkyLight", RTLD_NOW),
@@ -52,29 +62,18 @@ final class LockScreenWindow {
         _ = unsafeBitCast(spaceSetLevel, to: SpaceSetLevel.self)(connection, space, 400)
         _ = unsafeBitCast(showSpaces, to: ShowSpaces.self)(connection, [space] as CFArray)
 
-        let panel = NotchPanel(contentRect: NSRect(origin: .zero, size: Self.size),
-                               styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
+        // A plain borderless panel never becomes key, so your typing still goes to the password field.
+        // Transparent areas let clicks through to the login controls underneath.
+        let panel = NSPanel(contentRect: NSScreen.main?.frame ?? .zero,
+                            styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
         panel.isOpaque = false
         panel.backgroundColor = .clear
         panel.hasShadow = false
         panel.collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle]
-        let host = NSHostingView(rootView: LockScreenCard(player: player).withLook())
+        let host = NSHostingView(rootView: LockScreenPlayerView(player: player, onLockScreen: true).withLook())
         host.sizingOptions = []
         panel.contentView = host
         _ = unsafeBitCast(addWindows, to: AddWindows.self)(connection, space, [panel.windowNumber] as CFArray, 7)
         return panel
-    }
-}
-
-/// The mini player as it sits on the lock screen; invisible while nothing is playing.
-private struct LockScreenCard: View {
-    @ObservedObject var player: PlayerModel
-
-    var body: some View {
-        MiniPlayerCard(player: player) {}
-            .opacity(player.hasTrack ? 1 : 0)
-            .animation(.smooth, value: player.hasTrack)
-            .frame(width: 360, height: 210)
-            .environment(\.colorScheme, .dark)
     }
 }
