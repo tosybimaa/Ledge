@@ -4,6 +4,7 @@ import SwiftUI
 /// Positions are fractions of the reference 1440 × 900 pt screen so the preview window can be any size.
 struct LockScreenPlayerView: View {
     @ObservedObject var player: PlayerModel
+    @ObservedObject private var weather = WeatherModel.shared
     @Environment(\.look) private var look
     @State private var mode = Mode.mini
     @State private var lyricsOn = false
@@ -50,10 +51,13 @@ struct LockScreenPlayerView: View {
                 }
             }
             .foregroundStyle(.white.opacity(0.8))
-            // shortcut: fixed weather and battery until those services exist.
             HStack(spacing: 24) {
-                Label("24°", systemImage: "moon.fill")
-                Label("100%", systemImage: "bolt.fill")
+                if let temperature = weather.temperature {
+                    Label("\(temperature)°", systemImage: weather.symbol)
+                }
+                if let battery = Battery.status() {
+                    Label("\(battery.percent)%", systemImage: battery.charging ? "bolt.fill" : "battery.75percent")
+                }
             }
             .ledgeFont(20, .semibold)
             .opacity(artwork ? 0 : 1)
@@ -73,7 +77,7 @@ struct LockScreenPlayerView: View {
                         lyricsOn = false
                         mode = .mini
                     } label: {
-                        Artwork(size: 386, corner: 16).shadow(color: .black.opacity(0.4), radius: 30, y: 20)
+                        Artwork(size: 386, corner: 16, image: player.artwork).shadow(color: .black.opacity(0.4), radius: 30, y: 20)
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel("Back to mini player")
@@ -167,10 +171,17 @@ struct LyricsColumn: View {
     @ObservedObject var player: PlayerModel
 
     var body: some View {
+        // Five lines around the current one; a click jumps the song to that line.
+        let window = player.lyrics.indices.filter { abs($0 - player.lyricIndex) <= 2 }
         VStack(alignment: .leading, spacing: 40) {
-            ForEach(player.lyrics.indices, id: \.self) { i in
+            if player.lyrics.isEmpty {
+                Text(player.hasTrack ? "No synced lyrics for this song" : "Nothing playing")
+                    .ledgeFont(24, .semibold)
+                    .foregroundStyle(.white.opacity(0.4))
+            }
+            ForEach(window, id: \.self) { i in
                 let distance = abs(i - player.lyricIndex)
-                Button { player.lyricIndex = i } label: {
+                Button { player.seekToLyric(i) } label: {
                     Text(player.lyrics[i])
                         .ledgeFont(30, distance == 0 ? .bold : .semibold)
                         .foregroundStyle(.white.opacity(distance == 0 ? 1 : distance == 1 ? 0.4 : 0.25))
@@ -226,7 +237,7 @@ struct UserBadge: View {
 
 struct LockScreenPlayerView_Previews: PreviewProvider {
     @MainActor static var previews: some View {
-        LockScreenPlayerView(player: PlayerModel())
+        LockScreenPlayerView(player: PlayerModel(preview: true))
             .withLook()
             .frame(width: 1440, height: 900)
     }

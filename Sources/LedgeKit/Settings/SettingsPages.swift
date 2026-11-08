@@ -25,6 +25,11 @@ struct GeneralPage: View {
         SettingsScroll {
             ProfileHeader()
             SettingsCard { LaunchAtLoginToggle() }
+            SettingsCard(title: "Permissions", footer: "macOS asks the first time Ledge needs each one. If you said no, turn it on in System Settings.") {
+                PermissionRow(title: "Music and Spotify", detail: "Read and control the song", pane: "Privacy_Automation")
+                PermissionRow(title: "Location", detail: "Local weather", pane: "Privacy_LocationServices")
+                PermissionRow(title: "Bluetooth", detail: "AirPods connect and battery", pane: "Privacy_Bluetooth")
+            }
             SettingsCard(title: "Display", footer: "Choose which screens show the pill.") {
                 MenuRow(title: "Display", symbol: "display", selection: $display)
             }
@@ -90,7 +95,7 @@ struct AppearancePage: View {
     @AppStorage(K.cornerRadius.rawValue) private var radius = Look().radius
     @AppStorage(K.glassTint.rawValue) private var glassTint = Look().glassTint
     @AppStorage(K.accentColor.rawValue) private var accent = AccentChoice.system
-    @StateObject private var sample = PlayerModel()
+    @StateObject private var sample = PlayerModel(preview: true)
 
     private func percent(_ value: Double) -> String { "\(Int((value * 100).rounded()))%" }
 
@@ -322,6 +327,8 @@ struct WeatherPage: View {
                 ToggleRow(title: "Precise Location", symbol: "location.fill", isOn: $preciseLocation) { StateBadge(on: preciseLocation) }
             }
         }
+        .onChange(of: weather) { WeatherModel.shared.refresh() }
+        .onChange(of: preciseLocation) { WeatherModel.shared.refresh() }
     }
 }
 

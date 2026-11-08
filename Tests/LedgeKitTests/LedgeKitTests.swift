@@ -47,4 +47,27 @@ final class LedgeKitTests: XCTestCase {
         let otherKey = Curve25519.Signing.PrivateKey().publicKey.rawRepresentation.base64EncodedString()
         XCTAssertThrowsError(try Updater.verify(archive, signature: signature, publicKey: otherKey))
     }
+
+    func testSyncedLyricsParsing() {
+        let lrc = "[ar:Someone]\n[00:12.50]First line\n[00:05.00][01:00.00]Chorus\n[00:20.00]\n"
+        let lines = PlayerModel.parseLRC(lrc)
+        XCTAssertEqual(lines.map(\.text), ["Chorus", "First line", "Chorus"])
+        XCTAssertEqual(lines.map(\.time), [5, 12.5, 60])
+    }
+
+    func testAirPodsBatteryFromSystemProfiler() throws {
+        let json = """
+        {"SPBluetoothDataType":[{"device_connected":[{"AirPods Pro":{"device_batteryLevelLeft":"80%","device_batteryLevelRight":"74%","device_batteryLevelCase":"100%"}},{"Speaker":{"device_batteryLevelMain":"55%"}}]}]}
+        """
+        let data = Data(json.utf8)
+        XCTAssertEqual(SystemMonitor.parseBattery(data, name: "AirPods Pro"), 74)
+        XCTAssertEqual(SystemMonitor.parseBattery(data, name: "Speaker"), 55)
+        XCTAssertNil(SystemMonitor.parseBattery(data, name: "Keyboard"))
+    }
+
+    func testWeatherCodes() {
+        XCTAssertEqual(WeatherModel.symbol(code: 0, day: false), "moon.stars.fill")
+        XCTAssertEqual(WeatherModel.symbol(code: 63, day: true), "cloud.rain.fill")
+        XCTAssertEqual(WeatherModel.condition(code: 95), "Thunderstorm")
+    }
 }

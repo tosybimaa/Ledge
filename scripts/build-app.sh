@@ -25,11 +25,22 @@ cat > "$APP/Contents/Info.plist" <<EOF
     <key>CFBundleVersion</key><string>$VERSION</string>
     <key>LSMinimumSystemVersion</key><string>15.0</string>
     <key>LSUIElement</key><true/>
+    <key>NSAppleEventsUsageDescription</key><string>Ledge reads and controls the song playing in Music or Spotify.</string>
+    <key>NSLocationUsageDescription</key><string>Ledge uses your location to show local weather.</string>
+    <key>NSLocationWhenInUseUsageDescription</key><string>Ledge uses your location to show local weather.</string>
+    <key>NSBluetoothAlwaysUsageDescription</key><string>Ledge shows your AirPods and their battery when they connect.</string>
 </dict>
 </plist>
 EOF
 
-# Ad-hoc signature: enough to run on your own Mac.
-codesign --force --sign - "$APP"
+# macOS remembers permissions (Music, Location, Bluetooth) per signature. A fixed certificate keeps them
+# across updates; the ad-hoc fallback changes every build, so macOS asks again after each update.
+IDENTITY="${LEDGE_SIGN_IDENTITY:-Ledge Signing}"
+if security find-identity -p codesigning | grep -q "\"$IDENTITY\""; then
+    codesign --force --sign "$IDENTITY" "$APP"
+else
+    echo "Note: no \"$IDENTITY\" certificate, signing ad-hoc (permissions will be asked again after updates)."
+    codesign --force --sign - "$APP"
+fi
 ditto -c -k --keepParent "$APP" build/Ledge.zip
 echo "Built $APP and build/Ledge.zip (version $VERSION)"

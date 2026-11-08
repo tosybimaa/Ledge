@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 /// The pill: closed (artwork + waveform), an overlay, or the open player.
@@ -19,6 +20,7 @@ struct NotchView: View {
     @State private var hoverTask: Task<Void, Never>?
 
     private var open: Bool { notch.expanded && mediaPlayer }
+    private var showsSong: Bool { mediaPlayer && player.showsInPill }
     private var floating: Bool { notchSize == nil }
     // Closed capsule without a notch: 74 pt middle + 34 pt each side = 142 × 24 pt.
     private var baseWidth: CGFloat { (notchSize?.width ?? 74) + tuneWidth }
@@ -28,7 +30,7 @@ struct NotchView: View {
 
     private var size: CGSize {
         if open { return CGSize(width: floating ? 318 : max(318, baseWidth + 120), height: topInset + 155) }
-        let side: CGFloat = notch.hud?.sideWidth ?? (mediaPlayer ? 34 : 0)
+        let side: CGFloat = notch.hud?.sideWidth ?? (showsSong ? 34 : 0)
         return CGSize(width: baseWidth + side * 2, height: baseHeight)
     }
 
@@ -50,7 +52,7 @@ struct NotchView: View {
                     .padding(.horizontal, 10)
                     .frame(height: size.height)
                     .transition(.opacity)
-            } else if mediaPlayer {
+            } else if showsSong {
                 CollapsedPill(player: player, height: baseHeight)
                     .frame(height: size.height)
                     .transition(.opacity)
@@ -63,7 +65,7 @@ struct NotchView: View {
         .shadow(color: .black.opacity(open ? 0.4 : 0), radius: 20, y: 8)
         .contentShape(Rectangle())
         // Buttons inside take their own taps; a tap anywhere else opens or closes the player.
-        .onTapGesture { notch.expanded.toggle() }
+        .onTapGesture { if !open || !expandOnHover { notch.expanded.toggle() } }
         .onHover(perform: hover)
         .padding(.top, floating ? (open ? 2.5 : 3) : 0)
         // Closed Pill Size before hover, Interface Size once open; both grow from the top centre so they stay lined up.
@@ -112,7 +114,7 @@ struct CollapsedPill: View {
 
     var body: some View {
         HStack {
-            Artwork(size: height - 10, corner: (height - 10) * 0.28)
+            Artwork(size: height - 10, corner: (height - 10) * 0.28, image: player.artwork)
             Spacer()
             WaveformBars(playing: player.isPlaying, height: height * 0.32, barWidth: 2, spacing: 1.25)
         }
@@ -160,11 +162,11 @@ struct PlayerCardContent: View {
 
     @ViewBuilder private var artwork: some View {
         if let onArtwork {
-            Button(action: onArtwork) { Artwork(size: art, corner: art * 0.22) }
+            Button(action: onArtwork) { Artwork(size: art, corner: art * 0.22, image: player.artwork) }
                 .buttonStyle(.plain)
                 .accessibilityLabel("Show artwork")
         } else {
-            Artwork(size: art, corner: art * 0.22)
+            Artwork(size: art, corner: art * 0.22, image: player.artwork)
         }
     }
 }
@@ -237,19 +239,22 @@ struct TransportControls: View {
     @ViewBuilder private var left: some View {
         switch leftButton {
         case .like:
-            Button { player.isLiked.toggle() } label: {
+            Button { player.toggleLike() } label: {
                 Image(systemName: "heart.fill")
                     .foregroundStyle(player.isLiked ? Color.pink : Color.secondary)
                     .contentTransition(.symbolEffect(.replace))
                     .frame(width: 36, height: 36)
             }
+            .disabled(!player.canLike)  // Spotify has no "like" in AppleScript
+            .opacity(player.canLike ? 1 : 0.35)
             .accessibilityLabel(player.isLiked ? "Unlike" : "Like")
         case .none:
             Color.clear
         default:
-            // shortcut: shuffle/repeat are visual only until the player API is wired.
-            Button {} label: { Image(systemName: leftButton.symbol).foregroundStyle(.secondary).frame(width: 36, height: 36) }
-                .accessibilityLabel(leftButton.rawValue)
+            Button { leftButton == .shuffle ? player.toggleShuffle() : player.toggleRepeat() } label: {
+                Image(systemName: leftButton.symbol).foregroundStyle(.secondary).frame(width: 36, height: 36)
+            }
+            .accessibilityLabel(leftButton.rawValue)
         }
     }
 }
@@ -261,7 +266,7 @@ struct OutputList: View {
         VStack(alignment: .leading, spacing: 2) {
             Text("Output").ledgeFont(11, .semibold).foregroundStyle(.secondary).padding(.horizontal, 8)
             ForEach(player.outputs, id: \.self) { name in
-                Button { player.output = name } label: {
+                Button { player.selectOutput(name) } label: {
                     HStack {
                         Image(systemName: "laptopcomputer")
                         Text(name)
@@ -282,18 +287,26 @@ struct OutputList: View {
     }
 }
 
-/// shortcut: gradient placeholder until real album art arrives with the player API.
+/// Album art from the music app, or a gradient with a note while there is none.
 struct Artwork: View {
     var size: CGFloat
     var corner: CGFloat
+    var image: NSImage?
     @Environment(\.look) private var look
 
     var body: some View {
-        RoundedRectangle(cornerRadius: look.r(corner), style: .continuous)
-            .fill(LinearGradient(colors: [.orange, .indigo], startPoint: .topLeading, endPoint: .bottomTrailing))
-            .frame(width: size, height: size)
-            .overlay(Image(systemName: "music.note").ledgeFont(size * 0.4, .semibold).foregroundStyle(.white))
-            .accessibilityHidden(true)
+        let shape = RoundedRectangle(cornerRadius: look.r(corner), style: .continuous)
+        Group {
+            if let image {
+                Image(nsImage: image).resizable().aspectRatio(contentMode: .fill)
+            } else {
+                LinearGradient(colors: [.orange, .indigo], startPoint: .topLeading, endPoint: .bottomTrailing)
+                    .overlay(Image(systemName: "music.note").ledgeFont(size * 0.4, .semibold).foregroundStyle(.white))
+            }
+        }
+        .frame(width: size, height: size)
+        .clipShape(shape)
+        .accessibilityHidden(true)
     }
 }
 
@@ -306,7 +319,7 @@ struct WaveformBars: View {
     @Environment(\.look) private var look
 
     var body: some View {
-        TimelineView(.animation(paused: !playing)) { context in
+        TimelineView(.animation(minimumInterval: 1.0 / 15, paused: !playing)) { context in
             let t = context.date.timeIntervalSinceReferenceDate
             HStack(spacing: spacing) {
                 ForEach(0..<5, id: \.self) { i in
@@ -323,7 +336,7 @@ struct WaveformBars: View {
 // PreviewProvider instead of #Preview: the macro plugin ships only with Xcode, not the command-line tools.
 struct NotchView_Previews: PreviewProvider {
     @MainActor static var previews: some View {
-        let player = PlayerModel()
+        let player = PlayerModel(preview: true)
         let notch = NotchController(player: player)
         notch.expanded = true
         return NotchView(player: player, notch: notch, notchSize: nil)

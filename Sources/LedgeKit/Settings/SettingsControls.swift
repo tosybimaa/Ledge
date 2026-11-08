@@ -1,3 +1,4 @@
+import AppKit
 import ServiceManagement
 import SwiftUI
 
@@ -188,6 +189,21 @@ struct SettingSlider: View {
             Slider(value: $value, in: range, step: step) { Text(title ?? low) }
         } else {
             Slider(value: $value, in: range) { Text(title ?? low) }
+        }
+    }
+}
+
+/// A privacy permission with a button to its pane in System Settings.
+struct PermissionRow: View {
+    var title: String
+    var detail: String
+    var pane: String
+
+    var body: some View {
+        ActionRow(title: title, subtitle: detail, button: "Open") {
+            if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?\(pane)") {
+                NSWorkspace.shared.open(url)
+            }
         }
     }
 }
@@ -391,33 +407,36 @@ struct EdgePreview: View {
     }
 }
 
-/// shortcut: fixed sample data until WeatherKit is wired.
+/// Live weather card (WeatherModel), the same data the lock screen shows.
 struct WeatherPreview: View {
-    private let hours = [("18", "29°"), ("19", "27°"), ("20", "26°"), ("21", "25°"), ("22", "24°")]
+    @ObservedObject private var weather = WeatherModel.shared
 
     var body: some View {
         VStack(spacing: 0) {
             HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: 0) {
-                    Text("Your City").ledgeFont(14, .semibold)
-                    Text("30°").ledgeFont(38, .regular)
+                    Text(weather.city.isEmpty ? "Your City" : weather.city).ledgeFont(14, .semibold)
+                    Text(weather.temperature.map { "\($0)°" } ?? "--°").ledgeFont(38, .regular)
                 }
                 Spacer()
                 VStack(alignment: .trailing, spacing: 2) {
-                    Image(systemName: "sun.max.fill").ledgeFont(18).foregroundStyle(.yellow)
-                    Text("Mostly Clear")
-                    Text("UV 0")
-                    Text("H:33° L:21°")
+                    Image(systemName: weather.symbol).symbolRenderingMode(.multicolor).ledgeFont(18)
+                    Text(weather.condition)
+                    if let uv = weather.uv { Text("UV \(uv)") }
+                    if let high = weather.high, let low = weather.low { Text("H:\(high)° L:\(low)°") }
                 }
                 .ledgeFont(10, .semibold)
             }
             Spacer(minLength: 0)
             HStack {
-                ForEach(hours, id: \.0) { item in
+                if weather.hours.isEmpty {
+                    Text("Loading weather…").ledgeFont(11).foregroundStyle(.secondary).frame(maxWidth: .infinity)
+                }
+                ForEach(weather.hours) { hour in
                     VStack(spacing: 5) {
-                        Text(item.0).ledgeFont(9, .semibold).foregroundStyle(.secondary)
-                        Image(systemName: "moon.fill").ledgeFont(13)
-                        Text(item.1).ledgeFont(13, .semibold)
+                        Text(hour.label).ledgeFont(9, .semibold).foregroundStyle(.secondary)
+                        Image(systemName: hour.symbol).symbolRenderingMode(.multicolor).ledgeFont(13)
+                        Text("\(hour.temperature)°").ledgeFont(13, .semibold)
                     }
                     .frame(maxWidth: .infinity)
                 }

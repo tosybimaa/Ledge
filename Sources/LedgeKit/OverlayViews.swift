@@ -17,6 +17,30 @@ enum NotchHUD: Hashable {
         default: 64
         }
     }
+
+    /// Volume and brightness level; these go to the screen edge in Sensory › Apple Style.
+    var level: Double? {
+        switch self {
+        case .volume(let value), .brightness(let value): value
+        default: nil
+        }
+    }
+
+    /// How long it stays, from the Overlay Duration sliders.
+    var duration: Double {
+        let key: K? = switch self {
+        case .volume, .brightness: .sensoryDuration
+        case .charging: .batteryDuration
+        case .accessory, .output: .accessoryDuration
+        default: nil
+        }
+        let fallback: Double = switch self {
+        case .charging: 5
+        case .accessory, .output: 4
+        default: 3
+        }
+        return key.flatMap { UserDefaults.standard.object(forKey: $0.rawValue) as? Double } ?? fallback
+    }
 }
 
 struct HUDContent: View {
@@ -64,7 +88,8 @@ struct HUDContent: View {
         case .lock(let locked):
             Text(locked ? "Locked" : "Unlocked")
         case .accessory(let name, let percent):
-            Text("\(name) · \(percent)%").lineLimit(1)
+            // -1 while the battery level is still being read.
+            Text(percent >= 0 ? "\(name) · \(percent)%" : name).lineLimit(1)
         case .output(let name):
             Text(name).lineLimit(1)
         }
@@ -73,6 +98,22 @@ struct HUDContent: View {
 
 /// Sensory "Apple Style": a vertical slider on the edge of the screen.
 /// shortcut: view only; placing it on the chosen screen edge is part of the system step.
+/// The edge panel's content: an EdgeSlider while a volume or brightness overlay is showing.
+struct EdgeHUDView: View {
+    @ObservedObject var notch: NotchController
+
+    var body: some View {
+        ZStack {
+            if let hud = notch.edgeHUD, let level = hud.level {
+                EdgeSlider(symbol: hud == .brightness(level) ? "sun.max.fill" : "speaker.wave.2.fill", level: level)
+                    .transition(.opacity.combined(with: .scale(scale: 0.9)))
+            }
+        }
+        .frame(width: 64, height: 160)
+        .animation(.smooth(duration: 0.3), value: notch.edgeHUD)
+    }
+}
+
 struct EdgeSlider: View {
     var symbol: String
     var level: Double

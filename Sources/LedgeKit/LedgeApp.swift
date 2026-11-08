@@ -22,12 +22,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     // Lazy so both are created on the main actor at first use.
     lazy var player = PlayerModel()
     lazy var notch = NotchController(player: player)
+    lazy var monitor = SystemMonitor(notch: notch)
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Menu bar app with no Dock icon. In an Xcode app target, set LSUIElement in Info.plist instead.
         NSApp.setActivationPolicy(.accessory)
         notch.show()
+        monitor.start()
+        WeatherModel.shared.start()
         Updater.shared.startAutomaticChecks()
+    }
+
+    /// Opening Ledge again (Finder, Spotlight) brings the menu bar icon back, so Settings is never out of reach.
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        UserDefaults.standard.set(true, forKey: K.menuBarIcon.rawValue)
+        return true
     }
 }
 
