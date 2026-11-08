@@ -66,7 +66,8 @@ struct NotchView: View {
         .onTapGesture { notch.expanded.toggle() }
         .onHover(perform: hover)
         .padding(.top, floating ? (open ? 2.5 : 3) : 0)
-        .scaleEffect(look.uiScale, anchor: .top)  // Appearance › Interface Size
+        // Closed Pill Size before hover, Interface Size once open; both grow from the top centre so they stay lined up.
+        .scaleEffect(open ? look.uiScale : look.pillScale, anchor: .top)
         .opacity(notch.isHidden ? 0 : 1)
         .allowsHitTesting(!notch.isHidden)
         .frame(width: NotchController.canvas.width, height: NotchController.canvas.height, alignment: .top)

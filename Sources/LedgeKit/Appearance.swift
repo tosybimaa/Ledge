@@ -3,6 +3,8 @@ import SwiftUI
 /// Settings › Appearance, handed down the view tree so every surface follows it.
 struct Look: Equatable {
     var uiScale = 1.0
+    /// The closed pill (before hover) has its own size, so it can be bigger or smaller than the open player.
+    var pillScale = 1.0
     var textScale = 1.0
     var design: Font.Design?
     var border = 1.0
@@ -59,6 +61,7 @@ extension EnvironmentValues {
 /// Reads the stored appearance once at a window's root and passes it down.
 private struct LookProvider: ViewModifier {
     @AppStorage(K.uiScale.rawValue) private var uiScale = Look().uiScale
+    @AppStorage(K.pillScale.rawValue) private var pillScale = Look().pillScale
     @AppStorage(K.textScale.rawValue) private var textScale = Look().textScale
     @AppStorage(K.fontDesign.rawValue) private var font = FontChoice.system
     @AppStorage(K.borderWidth.rawValue) private var border = Look().border
@@ -67,7 +70,7 @@ private struct LookProvider: ViewModifier {
     @AppStorage(K.accentColor.rawValue) private var accent = AccentChoice.system
 
     func body(content: Content) -> some View {
-        let look = Look(uiScale: uiScale, textScale: textScale, design: font.design, border: border,
+        let look = Look(uiScale: uiScale, pillScale: pillScale, textScale: textScale, design: font.design, border: border,
                         radius: radius, glassTint: glassTint, accent: accent.color)
         content
             .environment(\.look, look)

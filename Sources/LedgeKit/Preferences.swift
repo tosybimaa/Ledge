@@ -22,13 +22,13 @@ enum K: String, CaseIterable {
     // Accessories
     case accessoryConnect, outputChange, listeningMode, accessoryStyle, glyph3D, accessoryDuration
     // Appearance
-    case uiScale, textScale, fontDesign, borderWidth, cornerRadius, accentColor
+    case uiScale, pillScale, textScale, fontDesign, borderWidth, cornerRadius, accentColor
     // Updates
     case autoUpdate, crashReports, lastUpdateCheck
 }
 
 enum Preferences {
-    static let appearance: [K] = [.uiScale, .textScale, .fontDesign, .borderWidth, .cornerRadius, .glassTint, .accentColor]
+    static let appearance: [K] = [.uiScale, .pillScale, .textScale, .fontDesign, .borderWidth, .cornerRadius, .glassTint, .accentColor]
 
     /// Launch at Login lives in SMAppService, not here, so it survives a reset.
     static func resetAll(_ defaults: UserDefaults = .standard) { reset(K.allCases, defaults) }
