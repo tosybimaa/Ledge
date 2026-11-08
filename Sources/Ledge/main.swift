@@ -1,0 +1,3 @@
+import LedgeKit
+
+LedgeApp.main()
