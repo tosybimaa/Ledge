@@ -53,12 +53,13 @@ enum OverlayLabel: String, Choice { case icon = "Icon", name = "Name" }
 enum GlassStyle: String, Choice { case clear = "Clear", frosted = "Frosted" }
 
 enum MediaSource: String, Choice {
-    case auto = "Auto", spotify = "Spotify", music = "Music"
+    case auto = "Auto", spotify = "Spotify", music = "Music", browser = "Browser"
     var symbol: String {
         switch self {
         case .auto: "sparkles"
         case .spotify: "music.note"
         case .music: "music.note.list"
+        case .browser: "globe"
         }
     }
 }

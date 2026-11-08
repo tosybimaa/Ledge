@@ -1,11 +1,20 @@
 import AppKit
 import SwiftUI
 
-/// The music apps Ledge can read and control.
+/// The music apps Ledge can read and control. Browsers play through web pages (YouTube, Spotify web, …).
 enum MusicApp: String {
-    case music = "Music", spotify = "Spotify"
+    case music = "Music", spotify = "Spotify", chrome = "Google Chrome", safari = "Safari"
 
-    var bundleID: String { self == .music ? "com.apple.Music" : "com.spotify.client" }
+    var isBrowser: Bool { self == .chrome || self == .safari }
+
+    var bundleID: String {
+        switch self {
+        case .music: "com.apple.Music"
+        case .spotify: "com.spotify.client"
+        case .chrome: "com.google.Chrome"
+        case .safari: "com.apple.Safari"
+        }
+    }
     /// Asking a closed app over AppleScript would launch it, so always check first.
     var isRunning: Bool { !NSRunningApplication.runningApplications(withBundleIdentifier: bundleID).isEmpty }
 
@@ -35,12 +44,64 @@ enum MusicApp: String {
                 return (player state as text) & d & (name of t) & d & (artist of t) & d & (((player position) div 1) as text) & d & (((duration of t) div 1000) as text) & d & "false" & d & (artwork url of t)
             end tell
             """
+        case .chrome, .safari:
+            // Only tabs on music sites run the page script; a playing tab wins over a paused one.
+            // The tab's URL goes last so controls can find the same tab again.
+            """
+            tell application "\(rawValue)"
+                set d to character id 31
+                set found to "stopped"
+                repeat with w in windows
+                    try
+                        set links to URL of tabs of w
+                    on error
+                        set links to {}
+                    end try
+                    repeat with i from 1 to count of links
+                        set u to item i of links
+                        if \(Self.musicSites) then
+                            try
+                                set r to \(runJS(Self.statusJS, in: "(tab i of w)"))
+                            on error
+                                set r to ""
+                            end try
+                            if r starts with "playing" then return r & d & u
+                            if r starts with "paused" and found is "stopped" then set found to r & d & u
+                        end if
+                    end repeat
+                end repeat
+                return found
+            end tell
+            """
         }
     }
+
+    /// AppleScript that runs `javascript` in a browser tab and returns its result.
+    func runJS(_ javascript: String, in tab: String) -> String {
+        self == .chrome ? "execute \(tab) javascript \"\(javascript)\"" : "do JavaScript \"\(javascript)\" in \(tab)"
+    }
+
+    private static let musicSites = ["youtube.com", "spotify.com", "soundcloud.com", "music.apple.com", "deezer.com",
+                                     "tidal.com", "bandcamp.com", "music.amazon", "pandora.com"]
+        .map { "u contains \"\($0)\"" }.joined(separator: " or ")
+
+    /// Page script (no double quotes or backslashes, so it fits inside an AppleScript string).
+    /// Picks the playing <video>/<audio>, else the first one with a length; `m` is that element.
+    static func pageJS(_ body: String) -> String {
+        "(function(){var els=[].slice.call(document.querySelectorAll('video,audio')).filter(function(e){return e.duration>0;});"
+            + "var m=els.filter(function(e){return !e.paused;})[0]||els[0];" + body + "})()"
+    }
+
+    /// Same fields as the apps, from the page's media element and Media Session info.
+    static let statusJS = pageJS("if(!m)return '';var md=navigator.mediaSession&&navigator.mediaSession.metadata;"
+        + "var a=md&&md.artwork&&md.artwork.length?md.artwork[md.artwork.length-1].src:'';"
+        + "return [m.paused?'paused':'playing',(md&&md.title)||document.title,(md&&md.artist)||'',Math.floor(m.currentTime),"
+        + "isFinite(m.duration)?Math.floor(m.duration):0,'false',a].join(String.fromCharCode(31));")
 }
 
-/// Now playing from Music or Spotify (Settings › Media › Source), read and controlled with AppleScript.
-/// shortcut: only Music and Spotify; browsers and other players need Apple's private MediaRemote framework.
+/// Now playing from Music, Spotify, Chrome or Safari (Settings › Media › Source), read and controlled with AppleScript.
+/// Browsers need "Allow JavaScript from Apple Events" turned on once.
+/// shortcut: other apps (Podcasts, VLC, …) need Apple's private MediaRemote framework.
 @MainActor
 final class PlayerModel: ObservableObject {
     @Published var title = "Nothing Playing"
@@ -58,6 +119,7 @@ final class PlayerModel: ObservableObject {
 
     private(set) var app: MusicApp?
     private var lyricTimes: [TimeInterval] = []
+    private var tabURL = ""
     private var trackKey = ""
     private var pausedAt: Date?
     private var timer: Timer?
@@ -91,10 +153,30 @@ final class PlayerModel: ObservableObject {
 
     // MARK: - Controls
 
-    func togglePlay() { command("playpause") }
-    func next() { command("next track") }
-    func previous() { command("previous track") }
-    func seek(to seconds: TimeInterval) { command("set player position to \(Int(seconds))") }
+    func togglePlay() {
+        if app?.isBrowser == true { pageCommand("if(m){m.paused?m.play():m.pause();}return '';") } else { command("playpause") }
+    }
+
+    func next() {
+        if app?.isBrowser == true {
+            // The site's own Next button (YouTube, YouTube Music, Spotify web, SoundCloud); nothing if the site has none.
+            pageCommand("var b=document.querySelector('.ytp-next-button,.next-button,[data-testid=control-button-skip-forward],.skipControl__next');if(b)b.click();return '';")
+        } else {
+            command("next track")
+        }
+    }
+
+    func previous() {
+        if app?.isBrowser == true {
+            pageCommand("var b=document.querySelector('.previous-button,[data-testid=control-button-skip-back],.skipControl__previous');if(b){b.click();}else if(m){m.currentTime=0;}return '';")
+        } else {
+            command("previous track")
+        }
+    }
+
+    func seek(to seconds: TimeInterval) {
+        if app?.isBrowser == true { pageCommand("if(m)m.currentTime=\(Int(seconds));return '';") } else { command("set player position to \(Int(seconds))") }
+    }
 
     func seekToLyric(_ index: Int) {
         guard lyricTimes.indices.contains(index) else { return }
@@ -142,12 +224,32 @@ final class PlayerModel: ObservableObject {
         poll()
     }
 
+    /// Runs a page script in the browser tab that is playing (found again by its URL).
+    private func pageCommand(_ body: String) {
+        guard let app, app.isBrowser, app.isRunning, !tabURL.isEmpty else { return }
+        let url = tabURL.replacingOccurrences(of: "\"", with: "%22").replacingOccurrences(of: "\\", with: "%5C")
+        run("""
+            tell application "\(app.rawValue)"
+                repeat with w in windows
+                    repeat with t in tabs of w
+                        if URL of t is "\(url)" then
+                            \(app.runJS(MusicApp.pageJS(body), in: "t"))
+                            return
+                        end if
+                    end repeat
+                end repeat
+            end tell
+            """)
+        poll()
+    }
+
     private func poll() {
         let choice = MediaSource(rawValue: UserDefaults.standard.string(forKey: K.source.rawValue) ?? "") ?? .auto
         let candidates: [MusicApp] = switch choice {
         case .music: [.music]
         case .spotify: [.spotify]
-        case .auto: [.music, .spotify]
+        case .browser: [.chrome, .safari]
+        case .auto: [.music, .spotify, .chrome, .safari]
         }
         var found: [(app: MusicApp, fields: [String])] = []
         for candidate in candidates where candidate.isRunning {
@@ -171,6 +273,7 @@ final class PlayerModel: ObservableObject {
         elapsed = TimeInterval(f[3]) ?? 0
         duration = TimeInterval(f[4]) ?? 0
         isLiked = f[5] == "true"
+        tabURL = f.count > 7 ? f[7] : ""
         hasTrack = true
 
         let key = pick.app.rawValue + f[1] + f[2]

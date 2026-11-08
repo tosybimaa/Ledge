@@ -25,7 +25,7 @@ cat > "$APP/Contents/Info.plist" <<EOF
     <key>CFBundleVersion</key><string>$VERSION</string>
     <key>LSMinimumSystemVersion</key><string>15.0</string>
     <key>LSUIElement</key><true/>
-    <key>NSAppleEventsUsageDescription</key><string>Ledge reads and controls the song playing in Music or Spotify.</string>
+    <key>NSAppleEventsUsageDescription</key><string>Ledge reads and controls the song playing in Music, Spotify, Chrome or Safari.</string>
     <key>NSLocationUsageDescription</key><string>Ledge uses your location to show local weather.</string>
     <key>NSLocationWhenInUseUsageDescription</key><string>Ledge uses your location to show local weather.</string>
     <key>NSBluetoothAlwaysUsageDescription</key><string>Ledge shows your AirPods and their battery when they connect.</string>

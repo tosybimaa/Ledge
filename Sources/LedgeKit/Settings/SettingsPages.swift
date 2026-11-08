@@ -26,7 +26,7 @@ struct GeneralPage: View {
             ProfileHeader()
             SettingsCard { LaunchAtLoginToggle() }
             SettingsCard(title: "Permissions", footer: "macOS asks the first time Ledge needs each one. If you said no, turn it on in System Settings.") {
-                PermissionRow(title: "Music and Spotify", detail: "Read and control the song", pane: "Privacy_Automation")
+                PermissionRow(title: "Music, Spotify and browsers", detail: "Read and control the song", pane: "Privacy_Automation")
                 PermissionRow(title: "Location", detail: "Local weather", pane: "Privacy_LocationServices")
                 PermissionRow(title: "Bluetooth", detail: "AirPods connect and battery", pane: "Privacy_Bluetooth")
             }
@@ -200,7 +200,7 @@ struct MediaPage: View {
     var body: some View {
         SettingsScroll {
             SettingsCard { ToggleRow("Media Player", isOn: $mediaPlayer) }
-            SettingsCard(footer: "Auto shows whatever app is playing music. Pick Spotify or Music to only ever show that app.") {
+            SettingsCard(footer: "Auto shows whatever is playing music: Music, Spotify, or a Chrome or Safari tab. Pick one to only ever show that.") {
                 ChoiceCards(title: "Source", selection: $source) { $0.symbol }
             }
             SettingsCard { ToggleRow("EQ", isOn: $eq) }
