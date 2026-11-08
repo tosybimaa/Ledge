@@ -104,14 +104,15 @@ struct SettingsSidebar: View {
                         .foregroundStyle(.secondary)
                         .padding(.leading, 10)
                     rows(SettingsPage.overlays)
+                    // Update scrolls with the rest instead of being pinned under the list.
+                    Divider().padding(.horizontal, 10).padding(.vertical, 6)
+                    rows(SettingsPage.account)
                 }
+                .padding(.bottom, 12)
             }
             .scrollIndicators(.never)
-
-            Divider().padding(.horizontal, 10).padding(.vertical, 12)
-            VStack(spacing: 6) { rows(SettingsPage.account) }
         }
-        .padding(EdgeInsets(top: 57, leading: 16, bottom: 18, trailing: 16))
+        .padding(EdgeInsets(top: 57, leading: 16, bottom: 0, trailing: 16))
     }
 
     private func rows(_ pages: [SettingsPage]) -> some View {
@@ -122,7 +123,8 @@ struct SettingsSidebar: View {
                         .ledgeFont(13, .semibold)
                         .frame(width: 30, height: 30)
                         .background(Color.white.opacity(0.14), in: RoundedRectangle(cornerRadius: look.r(8), style: .continuous))
-                    Text(p.rawValue).ledgeFont(13, .semibold)
+                    // One line always: shrink a little rather than wrap ("Appearanc / e").
+                    Text(p.rawValue).ledgeFont(13, .semibold).lineLimit(1).minimumScaleFactor(0.7)
                     Spacer(minLength: 0)
                 }
                 .padding(.horizontal, 10)

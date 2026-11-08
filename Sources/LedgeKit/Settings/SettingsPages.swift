@@ -23,7 +23,7 @@ struct GeneralPage: View {
 
     var body: some View {
         SettingsScroll {
-            ProfileHeader().padding(.top, -16)
+            ProfileHeader()
             SettingsCard { LaunchAtLoginToggle() }
             SettingsCard(title: "Display", footer: "Choose which screens show the pill.") {
                 MenuRow(title: "Display", symbol: "display", selection: $display)
