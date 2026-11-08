@@ -1,3 +1,4 @@
+import Collaboration
 import SwiftUI
 
 /// Lock screen player: small controller first; the thumbnail opens the artwork view, the side buttons add lyrics or hide the player.
@@ -219,19 +220,28 @@ struct RoundButton: View {
 }
 
 /// Initials of the Mac's user in a circle.
+/// Your macOS account picture (System Settings › Users & Groups); initials if there is none.
 struct UserBadge: View {
     var size: CGFloat
+
+    private static let picture = CBIdentity(name: NSUserName(), authority: .local())?.image
 
     private var initials: String {
         NSFullUserName().split(separator: " ").prefix(2).compactMap(\.first).map(String.init).joined()
     }
 
     var body: some View {
-        Circle()
-            .fill(LinearGradient(colors: [.blue, .indigo], startPoint: .top, endPoint: .bottom))
-            .frame(width: size, height: size)
-            .overlay(Text(initials).ledgeFont(size * 0.36, .bold).foregroundStyle(.white))
-            .accessibilityHidden(true)
+        Group {
+            if let picture = Self.picture {
+                Image(nsImage: picture).resizable().aspectRatio(contentMode: .fill)
+            } else {
+                LinearGradient(colors: [.blue, .indigo], startPoint: .top, endPoint: .bottom)
+                    .overlay(Text(initials).ledgeFont(size * 0.36, .bold).foregroundStyle(.white))
+            }
+        }
+        .frame(width: size, height: size)
+        .clipShape(Circle())
+        .accessibilityHidden(true)
     }
 }
 
