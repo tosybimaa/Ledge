@@ -93,10 +93,18 @@ enum MusicApp: String {
     }
 
     /// Same fields as the apps, from the page's media element and Media Session info.
-    static let statusJS = pageJS("if(!m)return '';var md=navigator.mediaSession&&navigator.mediaSession.metadata;"
+    /// Spotify's web player keeps its audio element out of the page, so without one the state comes from
+    /// Media Session and the times from Spotify's own position/duration labels.
+    static let statusJS = pageJS("var ms=navigator.mediaSession;var md=ms&&ms.metadata;var st=ms?ms.playbackState:'none';"
+        + "if(!m&&(!md||st==='none'))return '';"
+        + "var label=function(id){var e=document.querySelector('[data-testid='+id+']');if(!e)return 0;"
+        + "return e.textContent.split(':').map(Number).reduce(function(a,b){return a*60+b;},0)||0;};"
         + "var a=md&&md.artwork&&md.artwork.length?md.artwork[md.artwork.length-1].src:'';"
-        + "return [m.paused?'paused':'playing',(md&&md.title)||document.title,(md&&md.artist)||'',Math.floor(m.currentTime),"
-        + "isFinite(m.duration)?Math.floor(m.duration):0,'false',a].join(String.fromCharCode(31));")
+        + "var playing=m?!m.paused:st==='playing';"
+        + "var pos=m?Math.floor(m.currentTime):label('playback-position');"
+        + "var dur=m?(isFinite(m.duration)?Math.floor(m.duration):0):label('playback-duration');"
+        + "return [playing?'playing':'paused',(md&&md.title)||document.title,(md&&md.artist)||'',pos,dur,'false',a]"
+        + ".join(String.fromCharCode(31));")
 }
 
 /// Now playing from Music, Spotify, Chrome or Safari (Settings › Media › Source), read and controlled with AppleScript.
@@ -154,7 +162,11 @@ final class PlayerModel: ObservableObject {
     // MARK: - Controls
 
     func togglePlay() {
-        if app?.isBrowser == true { pageCommand("if(m){m.paused?m.play():m.pause();}return '';") } else { command("playpause") }
+        if app?.isBrowser == true {
+            pageCommand("if(m){m.paused?m.play():m.pause();}else{var b=document.querySelector('[data-testid=control-button-playpause]');if(b)b.click();}return '';")
+        } else {
+            command("playpause")
+        }
     }
 
     func next() {
