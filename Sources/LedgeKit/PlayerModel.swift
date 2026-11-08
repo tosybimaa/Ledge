@@ -96,12 +96,14 @@ enum MusicApp: String {
     /// Spotify's web player keeps its audio element out of the page, so without one the state comes from
     /// Media Session and the times from Spotify's own position/duration labels.
     static let statusJS = pageJS("var ms=navigator.mediaSession;var md=ms&&ms.metadata;var st=ms?ms.playbackState:'none';"
-        + "if(!m&&(!md||st==='none'))return '';"
+        + "if(!m&&!md)return '';"
         + "var label=function(id){var e=document.querySelector('[data-testid='+id+']');if(!e)return 0;"
         + "return e.textContent.split(':').map(Number).reduce(function(a,b){return a*60+b;},0)||0;};"
         + "var a=md&&md.artwork&&md.artwork.length?md.artwork[md.artwork.length-1].src:'';"
-        + "var playing=m?!m.paused:st==='playing';"
         + "var pos=m?Math.floor(m.currentTime):label('playback-position');"
+        // Spotify often leaves playbackState at 'none'; then "playing" means the time label moved in the last 2.5 s.
+        + "if(pos!==window.__ledgePos){window.__ledgePos=pos;window.__ledgeMoved=Date.now();}"
+        + "var playing=m?!m.paused:(st==='playing'||(st==='none'&&Date.now()-(window.__ledgeMoved||0)<2500));"
         + "var dur=m?(isFinite(m.duration)?Math.floor(m.duration):0):label('playback-duration');"
         + "return [playing?'playing':'paused',(md&&md.title)||document.title,(md&&md.artist)||'',pos,dur,'false',a]"
         + ".join(String.fromCharCode(31));")
