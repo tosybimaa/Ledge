@@ -6,7 +6,7 @@ import SwiftUI
 /// Positions are fractions of the reference 1440 × 900 pt screen so the preview window can be any size.
 struct LockScreenPlayerView: View {
     @ObservedObject var player: PlayerModel
-    /// On the real lock screen macOS draws the clock, wallpaper and login itself, so those stay out.
+    /// On the real lock screen macOS draws the wallpaper and login itself, and its own clock until the blur covers it.
     var onLockScreen = false
     @ObservedObject private var weather = WeatherModel.shared
     @AppStorage(K.lockFullArt.rawValue) private var fullArt = true
@@ -26,24 +26,21 @@ struct LockScreenPlayerView: View {
             let h = geo.size.height
             ZStack(alignment: .top) {
                 if onLockScreen {
-                    // Artwork view: your wallpaper heavily blurred like the reference. The top stays sharp so
-                    // macOS's own clock shows through untouched.
+                    // Artwork view: the whole lock screen blurred, wallpaper and macOS's clock included.
                     BehindWindowBlur()
-                        .overlay(Color.black.opacity(0.25))
-                        .mask(LinearGradient(stops: [.init(color: .clear, location: 0), .init(color: .clear, location: 0.22),
-                                                     .init(color: .black, location: 0.32)], startPoint: .top, endPoint: .bottom))
+                        .overlay(Color.black.opacity(0.3))
                         .opacity(artwork ? 1 : 0)
                 } else {
                     LinearGradient(colors: [Color(white: 0.26), Color(white: 0.06)], startPoint: .top, endPoint: .bottom)
                 }
-                RadialGradient(colors: [.orange.opacity(0.4), .clear], center: UnitPoint(x: 0.25, y: 0.55), startRadius: 0, endRadius: 700)
-                    .opacity(artwork && !onLockScreen ? 1 : 0)
 
-                header.padding(.top, h * 0.085)
                 if showsPlayer {
                     stage(height: h)
                         .scaleEffect(look.uiScale, anchor: .top)  // Appearance › Interface Size
                 }
+                header
+                    .padding(.top, h * 0.089)
+                    .allowsHitTesting(false)  // drawn over the stage; clicks go through to the artwork
                 if !onLockScreen {
                     login
                         .frame(maxHeight: .infinity, alignment: .bottom)
@@ -64,18 +61,10 @@ struct LockScreenPlayerView: View {
 
     private var header: some View {
         VStack(spacing: 0) {
-            TimelineView(.everyMinute) { context in
-                VStack(spacing: 0) {
-                    Text(context.date, format: .dateTime.weekday(.abbreviated).day().month(.abbreviated))
-                        .ledgeFont(24, .medium)
-                    Text(context.date, format: .dateTime.hour().minute())
-                        .ledgeFont(128, .heavy, design: .rounded)
-                        .monospacedDigit()
-                }
-            }
-            .foregroundStyle(.white.opacity(0.8))
-            // On the lock screen macOS's own clock is used; keep the space so the weather row lines up under it.
-            .opacity(onLockScreen ? 0 : 1)
+            // On the lock screen macOS's own clock shows until the blur covers it; this one then takes its place.
+            // The space is kept so the weather row lines up under either clock.
+            LockClock()
+                .opacity(onLockScreen && !artwork ? 0 : 1)
             HStack(spacing: 24) {
                 if let temperature = weather.temperature {
                     Label("\(temperature)°", systemImage: weather.symbol)
@@ -96,7 +85,7 @@ struct LockScreenPlayerView: View {
                 .padding(.top, h * 0.575)
                 .transition(.opacity.combined(with: .scale(scale: 0.94)))
         case .artwork:
-            HStack(alignment: .center, spacing: lyricsOn ? 166 : 0) {
+            HStack(alignment: .center, spacing: lyricsOn ? 120 : 0) {
                 VStack(spacing: 42) {
                     Button {
                         lyricsOn = false
@@ -105,6 +94,12 @@ struct LockScreenPlayerView: View {
                         Artwork(size: 386, corner: 16, image: player.artwork)
                             .overlay { GlassArtSheen(corner: 16) }
                             .shadow(color: .black.opacity(0.4), radius: 30, y: 20)
+                            .background {
+                                // The warm light behind the artwork.
+                                RadialGradient(colors: [.orange.opacity(0.4), .clear], center: .center, startRadius: 0, endRadius: 520)
+                                    .frame(width: 1100, height: 1100)
+                                    .allowsHitTesting(false)
+                            }
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel("Back to mini player")
@@ -112,7 +107,7 @@ struct LockScreenPlayerView: View {
                 }
                 if lyricsOn {
                     LyricsColumn(player: player)
-                        .frame(width: 540, alignment: .leading)
+                        .frame(width: 620, alignment: .leading)
                         .transition(.move(edge: .trailing).combined(with: .opacity))
                 }
             }
@@ -149,6 +144,29 @@ struct LockScreenPlayerView: View {
                 mode = mode == .hidden ? .mini : .hidden
             }
         }
+    }
+}
+
+/// Drawn like macOS's own lock screen clock (sizes measured from it on a 1440 × 900 screen),
+/// so nothing seems to change when the blur covers the real one. System font on purpose: Appearance › Font leaves it alone.
+private struct LockClock: View {
+    var body: some View {
+        TimelineView(.everyMinute) { context in
+            let date = context.date
+            VStack(spacing: -20) {
+                // "Mon 9 Nov", without the comma the standard format adds.
+                Text([date.formatted(.dateTime.weekday(.abbreviated)), date.formatted(.dateTime.day()),
+                      date.formatted(.dateTime.month(.abbreviated))].joined(separator: " "))
+                    .font(.system(size: 26, weight: .semibold))
+                    .foregroundStyle(.white.opacity(0.85))
+                Text(date, format: .dateTime.hour(.defaultDigits(amPM: .omitted)).minute())
+                    .font(.system(size: 130, weight: .bold))
+                    .tracking(-4)
+                    .foregroundStyle(LinearGradient(colors: [.white.opacity(0.78), .white.opacity(0.5)], startPoint: .top, endPoint: .bottom))
+                    .shadow(color: .black.opacity(0.2), radius: 10, y: 4)
+            }
+        }
+        .accessibilityElement(children: .combine)
     }
 }
 
@@ -243,17 +261,17 @@ struct LyricsColumn: View {
     var body: some View {
         // Five lines around the current one; a click jumps the song to that line.
         let window = player.lyrics.indices.filter { abs($0 - player.lyricIndex) <= 2 }
-        VStack(alignment: .leading, spacing: 40) {
+        VStack(alignment: .leading, spacing: 44) {
             if player.lyrics.isEmpty {
                 Text(player.hasTrack ? "No synced lyrics for this song" : "Nothing playing")
-                    .ledgeFont(24, .semibold)
+                    .ledgeFont(30, .semibold)
                     .foregroundStyle(.white.opacity(0.4))
             }
             ForEach(window, id: \.self) { i in
                 let distance = abs(i - player.lyricIndex)
                 Button { player.seekToLyric(i) } label: {
                     Text(player.lyrics[i])
-                        .ledgeFont(30, distance == 0 ? .bold : .semibold)
+                        .ledgeFont(36, distance == 0 ? .bold : .semibold)
                         .foregroundStyle(.white.opacity(distance == 0 ? 1 : distance == 1 ? 0.4 : 0.25))
                         .blur(radius: distance == 0 ? 0 : distance == 1 ? 1.5 : 5)
                         .multilineTextAlignment(.leading)
@@ -294,6 +312,7 @@ private struct BehindWindowBlur: NSViewRepresentable {
     func makeNSView(context: Context) -> NSVisualEffectView {
         let view = NSVisualEffectView()
         view.material = .fullScreenUI
+        view.appearance = NSAppearance(named: .darkAqua)  // dark blur, not the grey wash of the light variant
         view.blendingMode = .behindWindow
         view.state = .active
         return view
