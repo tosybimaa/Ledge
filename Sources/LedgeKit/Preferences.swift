@@ -8,6 +8,7 @@ enum K: String, CaseIterable {
     case lockSound, unlockSound, soundVolume, notchWidth, notchHeight
     // Media
     case mediaPlayer, source, eq, eqSub, eqLow, eqMid, eqPres, eqAir, leftButton
+    case pageLyrics, pagePrayer, pageCalendar
     case explicitTag, explicitColor, animatedArtwork, heartMatchColor, collapseOnPause, hideAfter
     // Sensory
     case sensoryStyle, edgeSide, edgeHeight, brightnessOverlay, volumeOverlay, sensoryMatchColor, overlayLabel, sensoryDuration
@@ -37,6 +38,7 @@ enum Preferences {
         .notchWidth: 0.0, .notchHeight: 0.0,
         .mediaPlayer: true, .source: MediaSource.auto.rawValue, .eq: false,
         .eqSub: 0.0, .eqLow: 0.0, .eqMid: 0.0, .eqPres: 0.0, .eqAir: 0.0, .leftButton: LeftButton.like.rawValue,
+        .pageLyrics: true, .pagePrayer: true, .pageCalendar: true,
         .explicitTag: true, .explicitColor: true, .animatedArtwork: true, .heartMatchColor: false,
         .collapseOnPause: true, .hideAfter: 0.0,
         .sensoryStyle: SensoryStyle.notch.rawValue, .edgeSide: ScreenEdge.left.rawValue, .edgeHeight: 0.5,

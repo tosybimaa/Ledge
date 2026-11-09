@@ -15,11 +15,19 @@ struct NotchView: View {
     @AppStorage(K.notchHeight.rawValue) private var tuneHeight = 0.0
     @AppStorage(K.mediaPlayer.rawValue) private var mediaPlayer = true
     @AppStorage(K.liquidGlass.rawValue) private var liquidGlass = true
+    @AppStorage(K.pageLyrics.rawValue) private var pageLyrics = true
+    @AppStorage(K.pagePrayer.rawValue) private var pagePrayer = true
+    @AppStorage(K.pageCalendar.rawValue) private var pageCalendar = true
     @Environment(\.look) private var look
 
     @State private var hoverTask: Task<Void, Never>?
 
     private var open: Bool { notch.expanded && mediaPlayer }
+    private var pages: [NotchPage] {
+        [.player] + (pageLyrics ? [.lyrics] : []) + (pagePrayer ? [.prayer] : []) + (pageCalendar ? [.calendar] : [])
+    }
+    private var pageIndex: Int { min(notch.page, pages.count - 1) }
+    private var page: NotchPage { pages[pageIndex] }
     private var showsSong: Bool { mediaPlayer && player.showsInPill }
     private var floating: Bool { notchSize == nil }
     // Closed capsule without a notch: 74 pt middle + 34 pt each side = 142 × 24 pt.
@@ -29,7 +37,11 @@ struct NotchView: View {
     private var topInset: CGFloat { floating ? 20 : baseHeight + 8 }
 
     private var size: CGSize {
-        if open { return CGSize(width: floating ? 318 : max(318, baseWidth + 120), height: topInset + 155) }
+        if open {
+            // The player keeps the reference size; the other pages are wider for their side-by-side layout.
+            let width: CGFloat = page == .player ? (floating ? 318 : max(318, baseWidth + 120)) : (floating ? 560 : max(560, baseWidth + 240))
+            return CGSize(width: width, height: topInset + 155)
+        }
         let side: CGFloat = notch.hud?.sideWidth ?? (showsSong ? 34 : 0)
         return CGSize(width: baseWidth + side * 2, height: baseHeight)
     }
@@ -45,8 +57,16 @@ struct NotchView: View {
     var body: some View {
         ZStack(alignment: .top) {
             if open {
-                PlayerCardContent(player: player, art: 56, artGap: 17, timeInset: 4, topInset: topInset)
-                    .transition(.opacity.combined(with: .scale(scale: 0.96, anchor: .top)))
+                Group {
+                    switch page {
+                    case .player: PlayerCardContent(player: player, art: 56, artGap: 17, timeInset: 4, topInset: topInset)
+                    case .lyrics: LyricsPage(player: player, topInset: topInset)
+                    case .prayer: PrayerPage(topInset: topInset)
+                    case .calendar: CalendarPage(topInset: topInset)
+                    }
+                }
+                .id(page)
+                .transition(.opacity.combined(with: .scale(scale: 0.96, anchor: .top)))
             } else if let hud = notch.hud {
                 HUDContent(hud: hud)
                     .padding(.horizontal, 10)
@@ -59,6 +79,7 @@ struct NotchView: View {
             }
         }
         .frame(width: size.width, height: size.height, alignment: .top)
+        .overlay { if open && pages.count > 1 { pageControls } }
         .background { background }
         .clipShape(shape)
         .overlay { shape.stroke(.white.opacity(floating || (open && liquidGlass) ? 0.12 : 0), lineWidth: look.border) }
@@ -75,8 +96,31 @@ struct NotchView: View {
         .frame(width: NotchController.canvas.width, height: NotchController.canvas.height, alignment: .top)
         .animation(.spring(response: 0.5, dampingFraction: 0.82), value: open)
         .animation(.spring(response: 0.45, dampingFraction: 0.85), value: notch.hud)
+        .animation(.spring(response: 0.45, dampingFraction: 0.86), value: page)
         .animation(.smooth(duration: 0.4), value: notch.isHidden)
         .environment(\.colorScheme, .dark)
+    }
+
+    /// Arrows in the side padding and dots along the bottom edge, so they never cover the player.
+    private var pageControls: some View {
+        let go: (Int) -> Void = { step in notch.page = (pageIndex + step + pages.count) % pages.count }
+        return ZStack {
+            HStack {
+                Button { go(-1) } label: { Image(systemName: "chevron.left").frame(width: 16, height: 36).contentShape(Rectangle()) }
+                    .accessibilityLabel("Previous page")
+                Spacer()
+                Button { go(1) } label: { Image(systemName: "chevron.right").frame(width: 16, height: 36).contentShape(Rectangle()) }
+                    .accessibilityLabel("Next page")
+            }
+            .padding(.horizontal, 3)
+            .padding(.top, topInset - 20)
+            PageDots(pages: pages, index: Binding(get: { pageIndex }, set: { notch.page = $0 }))
+                .frame(maxHeight: .infinity, alignment: .bottom)
+                .padding(.bottom, 5)
+        }
+        .buttonStyle(.plain)
+        .ledgeFont(10, .bold)
+        .foregroundStyle(.secondary)
     }
 
     /// Black while closed; dark glass (Clear ↔ Dark slider) when open.

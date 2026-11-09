@@ -18,7 +18,7 @@ enum MusicApp: String {
     /// Asking a closed app over AppleScript would launch it, so always check first.
     var isRunning: Bool { !NSRunningApplication.runningApplications(withBundleIdentifier: bundleID).isEmpty }
 
-    /// state ␟ title ␟ artist ␟ position ␟ duration ␟ favourite ␟ artwork URL. Whole seconds, so the
+    /// state ␟ title ␟ artist ␟ position (ms) ␟ duration (s) ␟ favourite ␟ artwork URL. Whole numbers, so the
     /// numbers never depend on the Mac's decimal separator.
     var statusScript: String {
         switch self {
@@ -32,7 +32,7 @@ enum MusicApp: String {
                     set fav to favorited of t
                 end try
                 set d to character id 31
-                return (player state as text) & d & (name of t) & d & (artist of t) & d & (((player position) div 1) as text) & d & (((duration of t) div 1) as text) & d & (fav as text) & d & ""
+                return (player state as text) & d & (name of t) & d & (artist of t) & d & (((player position) * 1000 div 1) as text) & d & (((duration of t) div 1) as text) & d & (fav as text) & d & ""
             end tell
             """
         case .spotify:
@@ -41,7 +41,7 @@ enum MusicApp: String {
                 if player state is stopped then return "stopped"
                 set t to current track
                 set d to character id 31
-                return (player state as text) & d & (name of t) & d & (artist of t) & d & (((player position) div 1) as text) & d & (((duration of t) div 1000) as text) & d & "false" & d & (artwork url of t)
+                return (player state as text) & d & (name of t) & d & (artist of t) & d & (((player position) * 1000 div 1) as text) & d & (((duration of t) div 1000) as text) & d & "false" & d & (artwork url of t)
             end tell
             """
         case .chrome, .safari:
@@ -103,7 +103,7 @@ enum MusicApp: String {
         // Spotify web also runs a short looping helper <audio>; its own time labels are the real song, so they win.
         + "var own=!!md&&!!document.querySelector('[data-testid=playback-duration]');"
         + "var el=own?null:m;"
-        + "var pos=el?Math.floor(el.currentTime):label('playback-position');"
+        + "var pos=el?Math.floor(el.currentTime*1000):label('playback-position')*1000;"
         // Spotify often leaves playbackState at 'none'; then "playing" means the time label moved in the last 2.5 s.
         + "if(pos!==window.__ledgePos){window.__ledgePos=pos;window.__ledgeMoved=Date.now();}"
         + "var playing=el?!el.paused:(st==='playing'||(st!=='paused'&&Date.now()-(window.__ledgeMoved||0)<2500));"
@@ -135,6 +135,9 @@ final class PlayerModel: ObservableObject {
     private var tabURL = ""
     private var trackKey = ""
     private var pausedAt: Date?
+    /// When `elapsed` was read; lyrics add the time since then, so they don't wait for the next poll.
+    private var sampledAt = Date()
+    private var lyricTimer: Timer?
     private var timer: Timer?
     private var scripts: [String: NSAppleScript] = [:]
 
@@ -149,6 +152,9 @@ final class PlayerModel: ObservableObject {
         refreshOutputs()
         timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
             Task { @MainActor in self?.poll() }
+        }
+        lyricTimer = Timer.scheduledTimer(withTimeInterval: 0.2, repeats: true) { [weak self] _ in
+            Task { @MainActor in self?.updateLyricIndex() }
         }
     }
 
@@ -287,7 +293,8 @@ final class PlayerModel: ObservableObject {
         isPlaying = playing
         title = f[1]
         artist = f[2]
-        elapsed = TimeInterval(f[3]) ?? 0
+        elapsed = (TimeInterval(f[3]) ?? 0) / 1000
+        sampledAt = Date()
         duration = TimeInterval(f[4]) ?? 0
         isLiked = f[5] == "true"
         tabURL = f.count > 7 ? f[7] : ""
@@ -367,8 +374,11 @@ final class PlayerModel: ObservableObject {
 
     private func updateLyricIndex() {
         // Settings › Lock Screen › Sync: positive shows lines earlier.
-        let now = elapsed + UserDefaults.standard.double(forKey: K.lyricsSync.rawValue) / 1000
-        lyricIndex = max(0, (lyricTimes.lastIndex { $0 <= now }) ?? 0)
+        guard !lyricTimes.isEmpty else { return }
+        let since = isPlaying ? min(Date().timeIntervalSince(sampledAt), 2) : 0
+        let now = elapsed + since + UserDefaults.standard.double(forKey: K.lyricsSync.rawValue) / 1000
+        let index = max(0, (lyricTimes.lastIndex { $0 <= now }) ?? 0)
+        if index != lyricIndex { lyricIndex = index }
     }
 
     /// "[01:02.50]Hello" lines into (62.5, "Hello"), sorted by time. Lines without words are skipped.

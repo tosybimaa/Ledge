@@ -1,3 +1,4 @@
+import AppKit
 import Collaboration
 import SwiftUI
 
@@ -25,13 +26,18 @@ struct LockScreenPlayerView: View {
             let h = geo.size.height
             ZStack(alignment: .top) {
                 if onLockScreen {
-                    // Your own wallpaper shows through; the artwork view darkens it like the reference.
-                    Color.black.opacity(artwork ? 0.82 : 0)
+                    // Artwork view: your wallpaper heavily blurred like the reference. The top stays sharp so
+                    // macOS's own clock shows through untouched.
+                    BehindWindowBlur()
+                        .overlay(Color.black.opacity(0.25))
+                        .mask(LinearGradient(stops: [.init(color: .clear, location: 0), .init(color: .clear, location: 0.22),
+                                                     .init(color: .black, location: 0.32)], startPoint: .top, endPoint: .bottom))
+                        .opacity(artwork ? 1 : 0)
                 } else {
                     LinearGradient(colors: [Color(white: 0.26), Color(white: 0.06)], startPoint: .top, endPoint: .bottom)
                 }
                 RadialGradient(colors: [.orange.opacity(0.4), .clear], center: UnitPoint(x: 0.25, y: 0.55), startRadius: 0, endRadius: 700)
-                    .opacity(artwork ? 1 : 0)
+                    .opacity(artwork && !onLockScreen ? 1 : 0)
 
                 header.padding(.top, h * 0.085)
                 if showsPlayer {
@@ -68,8 +74,8 @@ struct LockScreenPlayerView: View {
                 }
             }
             .foregroundStyle(.white.opacity(0.8))
-            // On the lock screen the system clock is already there; keep the space so the weather row lines up under it.
-            .opacity(onLockScreen && !artwork ? 0 : 1)
+            // On the lock screen macOS's own clock is used; keep the space so the weather row lines up under it.
+            .opacity(onLockScreen ? 0 : 1)
             HStack(spacing: 24) {
                 if let temperature = weather.temperature {
                     Label("\(temperature)°", systemImage: weather.symbol)
@@ -249,7 +255,7 @@ struct LyricsColumn: View {
                     Text(player.lyrics[i])
                         .ledgeFont(30, distance == 0 ? .bold : .semibold)
                         .foregroundStyle(.white.opacity(distance == 0 ? 1 : distance == 1 ? 0.4 : 0.25))
-                        .blur(radius: distance >= 2 ? 2 : 0)
+                        .blur(radius: distance == 0 ? 0 : distance == 1 ? 1.5 : 5)
                         .multilineTextAlignment(.leading)
                 }
                 .buttonStyle(.plain)
@@ -283,6 +289,19 @@ struct RoundButton: View {
 }
 
 /// Initials of the Mac's user in a circle.
+/// Blurs whatever is behind the window (here: the lock screen wallpaper).
+private struct BehindWindowBlur: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSVisualEffectView {
+        let view = NSVisualEffectView()
+        view.material = .fullScreenUI
+        view.blendingMode = .behindWindow
+        view.state = .active
+        return view
+    }
+
+    func updateNSView(_ view: NSVisualEffectView, context: Context) {}
+}
+
 /// Your macOS account picture (System Settings › Users & Groups); initials if there is none.
 struct UserBadge: View {
     var size: CGFloat

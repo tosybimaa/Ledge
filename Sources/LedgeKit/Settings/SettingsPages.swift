@@ -29,6 +29,7 @@ struct GeneralPage: View {
                 PermissionRow(title: "Music, Spotify and browsers", detail: "Read and control the song", pane: "Privacy_Automation")
                 PermissionRow(title: "Location", detail: "Local weather", pane: "Privacy_LocationServices")
                 PermissionRow(title: "Bluetooth", detail: "AirPods connect and battery", pane: "Privacy_Bluetooth")
+                PermissionRow(title: "Calendar", detail: "Events on the calendar page", pane: "Privacy_Calendars")
             }
             SettingsCard(title: "Display", footer: "Choose which screens show the pill.") {
                 MenuRow(title: "Display", symbol: "display", selection: $display)
@@ -185,6 +186,9 @@ struct AccentPicker: View {
 
 struct MediaPage: View {
     @AppStorage(K.mediaPlayer.rawValue) private var mediaPlayer = true
+    @AppStorage(K.pageLyrics.rawValue) private var pageLyrics = true
+    @AppStorage(K.pagePrayer.rawValue) private var pagePrayer = true
+    @AppStorage(K.pageCalendar.rawValue) private var pageCalendar = true
     @AppStorage(K.source.rawValue) private var source = MediaSource.auto
     @AppStorage(K.eq.rawValue) private var eq = false
     @AppStorage(K.leftButton.rawValue) private var leftButton = LeftButton.like
@@ -200,6 +204,11 @@ struct MediaPage: View {
     var body: some View {
         SettingsScroll {
             SettingsCard { ToggleRow("Media Player", isOn: $mediaPlayer) }
+            SettingsCard(title: "Notch Pages", footer: "Extra pages in the open pill. Switch with the arrows at its sides or the dots along the bottom. Prayer times use your weather location (Kemenag method).") {
+                ToggleRow("Lyrics", symbol: "quote.bubble", isOn: $pageLyrics)
+                ToggleRow("Prayer Times", symbol: "sun.horizon.fill", isOn: $pagePrayer)
+                ToggleRow("Calendar", symbol: "calendar", isOn: $pageCalendar)
+            }
             SettingsCard(footer: "Auto shows whatever is playing music: Music, Spotify, or a Chrome or Safari tab. Pick one to only ever show that.") {
                 ChoiceCards(title: "Source", selection: $source) { $0.symbol }
             }

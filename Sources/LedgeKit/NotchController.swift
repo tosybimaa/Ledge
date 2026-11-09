@@ -12,6 +12,8 @@ final class NotchController: ObservableObject {
     @Published var isHidden = false
     @Published var hud: NotchHUD?
     @Published var edgeHUD: NotchHUD?
+    /// Which page the open pill shows (player, lyrics, prayer, calendar); kept between openings.
+    @Published var page = 0
 
     let player: PlayerModel
     private var panels: [NotchPanel] = []

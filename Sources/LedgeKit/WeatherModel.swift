@@ -73,6 +73,7 @@ final class WeatherModel: NSObject, ObservableObject, CLLocationManagerDelegate 
     }
 
     private func load(latitude: Double, longitude: Double) async {
+        PrayerModel.shared.update(latitude: latitude, longitude: longitude)
         var components = URLComponents(string: "https://api.open-meteo.com/v1/forecast")
         components?.queryItems = [
             URLQueryItem(name: "latitude", value: String(latitude)),

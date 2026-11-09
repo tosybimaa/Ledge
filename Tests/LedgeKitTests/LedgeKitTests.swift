@@ -80,4 +80,18 @@ final class LedgeKitTests: XCTestCase {
         XCTAssertFalse(store.bool(forKey: K.hideFromCapture.rawValue))
         XCTAssertTrue(store.bool(forKey: K.expandOnHover.rawValue))
     }
+
+    func testNextPrayerAndCountdown() throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "Asia/Jakarta")!
+        let day = try XCTUnwrap(calendar.date(from: DateComponents(year: 2026, month: 11, day: 1, hour: 12, minute: 12)))
+        let prayers = [("Subuh", "04:10"), ("Dzuhur", "11:40"), ("Ashar", "14:56 (WIB)"), ("Maghrib", "17:49"), ("Isya", "19:01")]
+            .map { Prayer(name: $0.0, time: PrayerModel.time($0.1, on: day, calendar: calendar)!) }
+        let next = try XCTUnwrap(PrayerModel.next(after: day, in: prayers))
+        XCTAssertEqual(next.name, "Ashar")
+        XCTAssertEqual(PrayerModel.countdown(from: day, to: next.time), "2 h 44 min")
+        let late = day.addingTimeInterval(9 * 3600)  // 21:12, after Isya
+        XCTAssertEqual(PrayerModel.next(after: late, in: prayers)?.name, "Subuh")
+        XCTAssertNil(PrayerModel.time("soon", on: day))
+    }
 }
