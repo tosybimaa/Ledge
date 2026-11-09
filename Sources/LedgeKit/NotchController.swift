@@ -24,6 +24,9 @@ final class NotchController: ObservableObject {
     private var observers: [NSObjectProtocol] = []
     private var pauseWatch: AnyCancellable?
     private var shownDisplay = ""
+    private var swipeMonitor: Any?
+    private var swipeDistance = CGSize.zero
+    private var swipeDone = false
 
     /// Each panel stays at the largest size the pill grows to. Transparent pixels let clicks through.
     /// shortcut: if clicks under the pill get swallowed on some macOS version, resize the panel to the pill instead.
@@ -56,11 +59,36 @@ final class NotchController: ObservableObject {
                 Task { @MainActor in self?.rebuildPanels() }
             })
         }
+        swipeMonitor = NSEvent.addLocalMonitorForEvents(matching: .scrollWheel) { [weak self] event in
+            MainActor.assumeIsolated { _ = self?.swipe(event) }
+            return event
+        }
         // Settings › Media › Collapse on Pause.
         pauseWatch = player.$isPlaying.removeDuplicates().sink { [weak self] playing in
             guard let self, !playing, self.expanded, Self.isOn(.collapseOnPause) else { return }
             self.expanded = false
         }
+    }
+
+    /// A two-finger sideways swipe over the open pill turns one page per gesture; the page follows the fingers.
+    private func swipe(_ event: NSEvent) {
+        guard expanded, event.window is NotchPanel, event.hasPreciseScrollingDeltas, event.momentumPhase.isEmpty else { return }
+        if event.phase == .began || event.phase == .mayBegin {
+            swipeDistance = .zero
+            swipeDone = false
+        }
+        swipeDistance.width += event.scrollingDeltaX
+        swipeDistance.height += event.scrollingDeltaY
+        guard !swipeDone, let step = Self.swipeStep(swipeDistance, natural: event.isDirectionInvertedFromDevice) else { return }
+        swipeDone = true
+        page += step
+    }
+
+    /// +1 for the next page, -1 for the previous, nil while the swipe is short or mostly up and down.
+    nonisolated static func swipeStep(_ distance: CGSize, natural: Bool) -> Int? {
+        guard abs(distance.width) > 40, abs(distance.width) > 2 * abs(distance.height) else { return nil }
+        // With natural scrolling the deltas already point the way the fingers moved. Fingers left = next page.
+        return (distance.width > 0) == natural ? -1 : 1
     }
 
     /// Called by SystemMonitor when the screen locks and unlocks.

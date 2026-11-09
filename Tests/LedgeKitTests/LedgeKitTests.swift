@@ -81,6 +81,14 @@ final class LedgeKitTests: XCTestCase {
         XCTAssertTrue(store.bool(forKey: K.expandOnHover.rawValue))
     }
 
+    func testTrackpadSwipeTurnsPages() {
+        XCTAssertEqual(NotchController.swipeStep(CGSize(width: -60, height: 5), natural: true), 1)
+        XCTAssertEqual(NotchController.swipeStep(CGSize(width: 60, height: 5), natural: true), -1)
+        XCTAssertEqual(NotchController.swipeStep(CGSize(width: 60, height: 5), natural: false), 1)
+        XCTAssertNil(NotchController.swipeStep(CGSize(width: 20, height: 0), natural: true))
+        XCTAssertNil(NotchController.swipeStep(CGSize(width: 60, height: 50), natural: true))
+    }
+
     func testNextPrayerAndCountdown() throws {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(identifier: "Asia/Jakarta")!

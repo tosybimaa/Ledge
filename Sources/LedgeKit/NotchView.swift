@@ -26,7 +26,8 @@ struct NotchView: View {
     private var pages: [NotchPage] {
         [.player] + (pageLyrics ? [.lyrics] : []) + (pagePrayer ? [.prayer] : []) + (pageCalendar ? [.calendar] : [])
     }
-    private var pageIndex: Int { min(notch.page, pages.count - 1) }
+    /// notch.page only counts swipes up and down; wrapping it here keeps it valid when pages are switched off.
+    private var pageIndex: Int { (notch.page % pages.count + pages.count) % pages.count }
     private var page: NotchPage { pages[pageIndex] }
     private var showsSong: Bool { mediaPlayer && player.showsInPill }
     private var floating: Bool { notchSize == nil }
@@ -101,26 +102,11 @@ struct NotchView: View {
         .environment(\.colorScheme, .dark)
     }
 
-    /// Arrows in the side padding and dots along the bottom edge, so they never cover the player.
+    /// Dots along the bottom edge; a two-finger swipe on the trackpad turns the page (NotchController.swipe).
     private var pageControls: some View {
-        let go: (Int) -> Void = { step in notch.page = (pageIndex + step + pages.count) % pages.count }
-        return ZStack {
-            HStack {
-                Button { go(-1) } label: { Image(systemName: "chevron.left").frame(width: 16, height: 36).contentShape(Rectangle()) }
-                    .accessibilityLabel("Previous page")
-                Spacer()
-                Button { go(1) } label: { Image(systemName: "chevron.right").frame(width: 16, height: 36).contentShape(Rectangle()) }
-                    .accessibilityLabel("Next page")
-            }
-            .padding(.horizontal, 3)
-            .padding(.top, topInset - 20)
-            PageDots(pages: pages, index: Binding(get: { pageIndex }, set: { notch.page = $0 }))
-                .frame(maxHeight: .infinity, alignment: .bottom)
-                .padding(.bottom, 5)
-        }
-        .buttonStyle(.plain)
-        .ledgeFont(10, .bold)
-        .foregroundStyle(.secondary)
+        PageDots(pages: pages, index: Binding(get: { pageIndex }, set: { notch.page = $0 }))
+            .frame(maxHeight: .infinity, alignment: .bottom)
+            .padding(.bottom, 5)
     }
 
     /// Black while closed; dark glass (Clear ↔ Dark slider) when open.
